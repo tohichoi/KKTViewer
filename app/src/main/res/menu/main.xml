@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/openLog"
+        android:icon="@drawable/ic_menu_note_add"
+        android:title="Open log..."
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/saveLog"
+        android:icon="@android:drawable/ic_menu_save"
+        android:title="Open log..."
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/findMessage"
+        android:icon="@android:drawable/ic_menu_search"
+        android:title="Open log..."
+        app:showAsAction="always" />
+
+</menu>
