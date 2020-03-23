@@ -6,40 +6,41 @@ import android.util.Log
 import java.io.*
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.*
 
 
-class ChatLogReader(private val context: Context) {
+class KKTChatLogReader(private val context: Context) {
 
     fun readTextLog(uri: Uri?, myName:String?) : List<KKTMessage> {
-        return ChatTextReader(context, null, myName).readFile(uri)
+        return KKTChatTextReader(context, null, myName).readFile(uri)
     }
 }
 
-class ChatTextReader(private val context: Context, val uri:Uri?=null, private val myName:String?) {
+class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private val myName:String?) {
 
     companion object {
         val TIME_PATTERN = """(\d{4})년 (\d{1,2})월 (\d{1,2})일 (오후|오전) (\d{1,2}):(\d{1,2})"""
         val MESSAGE_PATTERN = """, ([^:]+) : (.+)$"""
 
         enum class LineType {
-            HEADER, SAVING_TIME, CHUNK_START, MESSAGE, TEXT, NONE
+            HEADER, SAVING_TIME, CHUNK_START, MESSAGE, MESSAGE_CONTINUED, NONE
         }
 
         fun parseDateTimeExpr(line:String) : Pair<Date, Int>? {
             val res1:MatchResult? = Regex(TIME_PATTERN).find(line)
             if (res1 != null) {
                 val gv=res1.groupValues
-                val dt=LocalDateTime.of(
+                val lt=LocalDateTime.of(
                     gv[1].toInt(),
                     gv[2].toInt(),
                     gv[3].toInt(),
                     if (gv[4] == "오전") gv[5].toInt() else gv[5].toInt().rem(12) + 12,
                     gv[6].toInt()
                 )
-                val dt2=Date.from(dt.atZone(ZoneId.systemDefault()).toInstant())
+                val dt2=Date.from(lt.atZone(ZoneId.systemDefault()).toInstant())
                 return Pair<Date, Int>(dt2, res1.range.last)
             }
             return null
@@ -85,13 +86,14 @@ class ChatTextReader(private val context: Context, val uri:Uri?=null, private va
             return Pair(LineType.MESSAGE, parseMessageExpr(line))
         }
 
-        return Pair(LineType.TEXT, line)
+        return Pair(LineType.MESSAGE_CONTINUED, line)
     }
 
 
     public fun readFile(uri:Uri?=null) : List<KKTMessage> {
         val messageList=ArrayList<KKTMessage>()
         var count = 0
+        var chunkcount = 0
         var ins: InputStream?
         var f: File
         var text: String = ""
@@ -131,8 +133,9 @@ class ChatTextReader(private val context: Context, val uri:Uri?=null, private va
                     }
                     // Pair(LineType.CHUNK_START, Date)
                     LineType.CHUNK_START -> {
+                        chunkcount++
                         val chatChunkTime=res.second
-                        if (prevlt == LineType.TEXT) {
+                        if (prevlt == LineType.MESSAGE) {
                             val res2= parseDateTimeExpr(line)
                             insertMessage(messageList, time!!, nick, text)
                             time=null
@@ -142,7 +145,7 @@ class ChatTextReader(private val context: Context, val uri:Uri?=null, private va
                     }
                     // Pair(LineType.MESSAGE, Triple(messageTime:Date, author:String, message:String))
                     LineType.MESSAGE -> {
-                        if (prevlt == LineType.MESSAGE) {
+                        if (prevlt == LineType.MESSAGE || prevlt == LineType.MESSAGE_CONTINUED) {
                             insertMessage(messageList, time!!, nick, text)
                             time=null
                             nick=""
@@ -154,12 +157,12 @@ class ChatTextReader(private val context: Context, val uri:Uri?=null, private va
                         text=res2.third as String
                     }
                     // Pair(LineType.TEXT, line:String)
-                    LineType.TEXT -> {
+                    LineType.MESSAGE_CONTINUED -> {
                         if (prevlt == LineType.SAVING_TIME) {
                             continue@loop
                         }
                         else if (prevlt == LineType.MESSAGE) {
-                            text += line
+                            text += if (line.isEmpty()) "\n" else line
                             continue@loop
                         }
                     }
@@ -174,6 +177,7 @@ class ChatTextReader(private val context: Context, val uri:Uri?=null, private va
             Thread.currentThread().interrupt()
         } finally {
             br.close()
+            Log.d("mike", "Chuck count = $chunkcount")
         }
 
         return messageList.toList()
@@ -183,7 +187,8 @@ class ChatTextReader(private val context: Context, val uri:Uri?=null, private va
         val msgId=messageList.size.toString()
         val name=if (myName != null && nick=="회원님") myName else nick
         val author=KKTAuthor(name, name, null)
-        val message=KKTMessage(msgId, text.trim(), author, time)
+//        val message=KKTMessage(msgId, text.trim(), author, time)
+        val message=KKTMessage(msgId, "[$msgId] " + text.trim(), author, time)
 
         messageList.add(message)
 
@@ -206,8 +211,6 @@ class ChatTextReader(private val context: Context, val uri:Uri?=null, private va
 
         return datetime
     }
-
-
 
 
     public fun readFolder(uri:Uri?=null) : List<KKTMessage> {
