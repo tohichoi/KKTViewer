@@ -4,9 +4,8 @@
     <style name="AppTheme" parent="Theme.MaterialComponents.DayNight">
         <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorSecondary">@color/colorSecondary</item>
-        <item name="colorAccent">@color/colorAccent</item>
+        <item name="colorAccent">@color/colorPrimaryAccent</item>
     </style>
 
     <style name="AppTheme.NoActionBar">
@@ -18,10 +17,27 @@
 
     <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
-    <style name="MessagesList">
+    <style name="MessagesListView">
         <item name="incomingBubblePaddingTop">@dimen/text_padding</item>
         <item name="incomingBubblePaddingBottom">@dimen/text_padding</item>
+        <item name="incomingTextColor">@android:color/primary_text_dark</item>
+        <item name="incomingDefaultBubbleColor">#ff666666</item>
         <item name="outcomingBubblePaddingTop">@dimen/text_padding</item>
         <item name="outcomingBubblePaddingBottom">@dimen/text_padding</item>
+        <item name="outcomingTextColor">@android:color/primary_text_dark</item>
+        <item name="outcomingDefaultBubbleColor">#ff333333</item>
     </style>
+
+    <style name="DateHeader">
+        <item name="android:textSize">@dimen/message_date_header_text_size</item>
+        <item name="android:textColor">#ffff0000</item>
+        <item name="dateHeaderTextColor">@color/colorPrimaryAccent</item>
+        <item name="android:colorBackground">@android:color/background_dark</item>
+<!--        <item name="android:backgr">@android:color/background_dark</item>-->
+        <item name="android:padding">16dp</item>
+        <item name="android:paddingTop">32dp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+
 </resources>

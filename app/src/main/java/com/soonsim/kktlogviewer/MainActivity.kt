@@ -10,57 +10,103 @@ import android.util.Log
 import android.util.TypedValue
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.datepicker.CalendarConstraints
 import com.google.android.material.datepicker.MaterialDatePicker
+import com.soonsim.kktlogviewer.DateConversion.Companion.getISOString
+import com.stfalcon.chatkit.commons.models.IMessage
 import com.stfalcon.chatkit.messages.MessageInput
 import com.stfalcon.chatkit.messages.MessagesListAdapter
 import com.stfalcon.chatkit.messages.MessagesListAdapter.HoldersConfig
+import com.stfalcon.chatkit.utils.DateFormatter
+import io.realm.*
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.android.synthetic.main.item_custom_date_header.view.*
 import org.apache.commons.lang3.time.DateUtils
 import java.lang.Integer.max
-import java.time.LocalDate
+import java.lang.Integer.min
 import java.time.LocalDateTime
-import java.time.OffsetDateTime
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.*
 
 
 class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     MessagesListAdapter.OnLoadMoreListener, MessageInput.InputListener,
     MessageInput.TypingListener, MessageInput.AttachmentsListener {
-    val imageLoader=KKTImageLoader(this)
+    private val imageLoader=KKTImageLoader(this)
     lateinit var config:KKTConfig
     private lateinit var mDatePickerDialog: DatePickerDialog
-//    private lateinit var mDateDialogBuilder : MaterialDatePicker.Builder<*> = MaterialDatePicker.Builder.datePicker()
-//    private lateinit var mmDateDialog : MaterialDatePicker<*> = mDateDialogBuilder.build()
-    lateinit var mMessageData:List<KKTMessage>
+    private var mMessageData=ArrayList<KKTMessage>()
     lateinit var adapter:MessagesListAdapter<KKTMessage>
     private var selectionCount = 0
     private var scrollTriggered = false
-    private var today: Long = 0
-    private var nextMonth: Long = 0
-    private var janThisYear: Long = 0
-    private var decThisYear: Long = 0
-    private var oneYearForward: Long = 0
-    private var todayPair: Pair<Long, Long>? = null
-    private var nextMonthPair: Pair<Long, Long>? = null
+    private lateinit var realmconfig: RealmConfiguration
+    private var mMenu:Menu?=null
+
+
+    class KKTDateFormatter : DateFormatter.Formatter {
+        override fun format(date: Date?): String {
+            return getISOString(date!!)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-//        setSupportActionBar(toolbar)
 
         initData()
+
+        // default conf
+//        Realm.init(this)
+//        realmconfig = RealmConfiguration.Builder()
+//            .name("myrealm.realm")
+//            .build()
+//        Realm.setDefaultConfiguration(realmconfig)
 
         val holdersConfig = HoldersConfig()
         holdersConfig.setDateHeaderLayout(R.layout.item_custom_date_header)
 
         adapter=MessagesListAdapter<KKTMessage>(config.authorId, holdersConfig, imageLoader)
+        adapter.setDateHeadersFormatter(KKTDateFormatter())
+
+        Realm.init(this)
+        realmconfig = RealmConfiguration.Builder()
+            .name("kktviewer.realm")
+//            .encryptionKey(getMyKey())
+            .schemaVersion(1)
+            .migration(KKTRealmMigration())
+            .build()
+        if (config.useDatabase) {
+            val realm=Realm.getInstance(realmconfig)
+            mMessageData.addAll(realm.where(KKTMessage::class.java).sort("messageTime").findAll())
+            adapter.clear()
+            adapter.addToEnd(mMessageData, true)
+//            adapter.notifyDataSetChanged()
+        }
+
         messagesListView.setAdapter(adapter)
+
+        messagesListView.addOnScrollListener(object: RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                super.onScrollStateChanged(recyclerView, newState)
+                when (newState) {
+                    RecyclerView.SCROLL_STATE_IDLE -> {
+//                        currentDate
+                        fab_down.show()
+                        fab_up.show()
+                    }
+                    else -> {
+                        fab_down.hide()
+                        fab_up.hide()
+                    }
+                }
+            }
+        })
 
         /*
         val input = findViewById<MessageInput>(R.id.input)
@@ -69,6 +115,65 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         input.setAttachmentsListener(this)
 
          */
+
+        fab_up.setOnLongClickListener(object: View.OnLongClickListener {
+            override fun onLongClick(v: View?): Boolean {
+                val date=getDateOfItem(adapter.items.size-1)
+                if (date != null) {
+                    viewMessageFromDate(date, true)
+                    return true
+                }
+                return false
+            }
+        })
+
+        fab_down.setOnLongClickListener(object: View.OnLongClickListener {
+            override fun onLongClick(v: View?): Boolean {
+                val date=getDateOfItem(0)
+                if (date != null) {
+                    viewMessageFromDate(date, false)
+                    return true
+                }
+                return false
+            }
+        })
+
+        fab_up.setOnClickListener { view ->
+            val pos=(messagesListView.layoutManager as LinearLayoutManager).findLastCompletelyVisibleItemPosition()
+            if (pos != RecyclerView.NO_POSITION) {
+                val date=getDateOfItem(pos)
+                if (date != null)
+                    viewMessageFromDate(date, true)
+            }
+        }
+        fab_down.setOnClickListener { view ->
+            val pos=(messagesListView.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition()
+            if (pos != RecyclerView.NO_POSITION) {
+                val date=getDateOfItem(pos)
+                if (date != null)
+                    viewMessageFromDate(date, false)
+            }
+        }
+    }
+
+    private fun getDateOfItem(pos:Int) : Date? {
+        var date:Date?=null
+
+        if (pos < 0 || pos > adapter.items.size-1)
+            return null
+
+        with (adapter.items[pos]) {
+            if (item is Date) {
+                if (pos == adapter.items.size-1)
+                    date=((item) as Date)
+                else
+                    return getDateOfItem(pos + 1)
+            }
+            else if (item is IMessage)
+                date=((item) as KKTMessage).createdAt!!
+        }
+
+        return date!!
     }
 
     private fun initData() {
@@ -79,22 +184,10 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         if (config.authorId.isEmpty())
             config.authorId="최현일"
 
-//        if (config.lastViewedDate == 0L) {
-//            config.lastViewedDate=LocalDateTime.now().toInstant().toEpochMilli()
-//        }
-
         val viewDate=if (config.lastViewedDate > 0L)
             DateConversion.millsToLocalDateTime(config.lastViewedDate)
         else
             LocalDateTime.now()
-
-        /*
-        mDatePickerDialog = DatePickerDialog(this, { _, year, month, dayOfMonth ->
-            // goto data
-            viewMessageFromDate(year, month+1, dayOfMonth)
-        },
-            viewDate.year-1, viewDate.monthValue+1, viewDate.dayOfYear)
-         */
     }
 
     override fun onStartTyping() {
@@ -143,27 +236,39 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     }
 
 
-    private fun viewMessageFromDate(year: Int, month: Int, dayOfMonth: Int) {
-        val lt=LocalDateTime.of(year, month, dayOfMonth, 0, 0, 0)
-        val dt1=Date.from(lt.atZone(ZoneId.systemDefault()).toInstant())
-        val ml=mMessageData.asReversed()
-        val idx=ml.binarySearch {
+    private fun getMessagePositionByDate(date:Date) : Int {
+        val idx=mMessageData.asReversed().binarySearch {
             val dt0=it.createdAt!!
-            DateUtils.truncatedCompareTo(dt0, dt1, Calendar.DAY_OF_MONTH)
+            DateUtils.truncatedCompareTo(dt0, date, Calendar.DAY_OF_MONTH)
         }
+
+        return idx
+    }
+
+    private fun viewMessageFromDate(date:Date, toBeginning:Boolean) {
+        val md=mMessageData.asReversed()
+        val idx=getMessagePositionByDate(date)
         if (idx < 0)
             Toast.makeText(this, "Cannot find message", Toast.LENGTH_SHORT).show()
         else {
-            Log.d("mike", "Found position: ${ml[idx]}")
-            val startIdx=getStartIndexOfDay(idx)
-            val datePos=adapter.getDateHeaderPosition(ml[startIdx].createdAt)
+            Log.d("mike", "Found position: ${md[idx]}")
+            val startIdx=getStartIndexOfDay(idx, toBeginning)
+            val datePos=adapter.getDateHeaderPosition(md[startIdx].createdAt)
 
-            val posDate=max(0, adapter.itemCount - datePos -1)
-            val absDatePos=max(0, adapter.itemCount - posDate - 1)
+            val posDate=min(adapter.itemCount-1, max(0, adapter.itemCount - datePos -1))
+            val absDatePos=min(adapter.itemCount-1, max(0, adapter.itemCount - posDate - 1))
             val llm=(messagesListView.layoutManager as LinearLayoutManager)
+
+            val vdate=messagesListView.findViewHolderForAdapterPosition(datePos)
             val offset=messagesListView.bottom - spToPx(resources.getDimension(R.dimen.message_date_header_text_size), this)
             llm.scrollToPositionWithOffset(absDatePos, offset)
         }
+    }
+
+    private fun viewMessageFromDate(year: Int, month: Int, dayOfMonth: Int, toBeginning:Boolean) {
+        val lt=LocalDateTime.of(year, month, dayOfMonth, 0, 0, 0)
+        val date=Date.from(lt.atZone(ZoneId.systemDefault()).toInstant())
+        viewMessageFromDate(date, toBeginning)
     }
 
     fun spToPx(sp: Float, context: Context): Int {
@@ -174,39 +279,56 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         ).toInt()
     }
 
-    private fun getStartIndexOfDay(curIdx: Int): Int {
+    private fun getStartIndexOfDay(curIdx: Int, toBeginning:Boolean): Int {
         // 날짜가 바뀌지 않을 때 까지 반복한다
         val ml=mMessageData.asReversed()
         val dt1=ml[curIdx].createdAt!!
         var startIdx=0
-        var endIdx=curIdx
-
-        // find prev day
-//        for (j in curIdx+1 until mMessageData.size){
-//            val dt0=ml[j].createdAt!!
-//            if (!DateUtils.isSameDay(dt0, dt1)) {
-//                startIdx=j
-//                break
-//            }
-//        }
 
         // find next day
-        for (j in curIdx-1 downTo 0 step 1) {
-            val dt0=ml[j].createdAt!!
-            if (!DateUtils.isSameDay(dt0, dt1)) {
-                startIdx=j+1
-                break
+        if (!toBeginning) {
+            startIdx=mMessageData.size-1
+            for (j in curIdx+1 until mMessageData.size){
+                val dt0=ml[j].createdAt!!
+                if (!DateUtils.isSameDay(dt0, dt1)) {
+                    startIdx=j
+                    break
+                }
+            }
+        }  else { // find prev day
+            for (j in curIdx - 1 downTo 0 step 1) {
+                val dt0 = ml[j].createdAt!!
+                if (!DateUtils.isSameDay(dt0, dt1)) {
+                    startIdx = j + 1
+                    break
+                }
             }
         }
 
-//        if (startIdx != curIdx)
         return startIdx
     }
 
 
+
+    fun toggleMenuItemEnabled(rid:Int, isEnabled:Boolean) {
+        if (mMenu == null)
+            return
+
+        val item=mMenu?.findItem(rid)
+        item?.isEnabled=isEnabled
+        item?.icon?.alpha=if (isEnabled) 0xFF else 0x7F
+    }
+
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.main, menu)
+        mMenu=menu
+
+        // default state
+        toggleMenuItemEnabled(R.id.saveLog, !config.useDatabase && mMessageData.isNotEmpty())
+        toggleMenuItemEnabled(R.id.moveToDay, mMessageData.isNotEmpty())
+        toggleMenuItemEnabled(R.id.findMessage, mMessageData.isNotEmpty())
+
         return true
     }
 
@@ -234,6 +356,17 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         }
     }
 
+    private fun openDb(): Boolean {
+        val realm = Realm.getInstance(realmconfig)
+        val result=realm.where(KKTMessage::class.java).findAll().sort("messageId", Sort.ASCENDING)
+        mMessageData.clear()
+        mMessageData.addAll(result.subList(0, result.size))
+        adapter.notifyDataSetChanged()
+        realm.close()
+
+        return true
+    }
+
     override fun onSubmit(input: CharSequence?): Boolean {
         return false
     }
@@ -251,7 +384,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     private fun getDateFromUser() {
 
         val datelist=ArrayList<Long>()
-        val selday:Long
+        val selecteddate:Long
 
         for (item in adapter.dateSet) {
             var cal=getClearedUtc()
@@ -264,21 +397,21 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             datelist.add(cal.timeInMillis)
         }
 
-        selday=if (config.lastViewedDate == 0L)
+        selecteddate=if (config.lastViewedDate == 0L)
             datelist.min()!!
         else
             config.lastViewedDate
 
         val builder: MaterialDatePicker.Builder<*> =
-            MaterialDatePicker.Builder.datePicker().setSelection(selday)
+            MaterialDatePicker.Builder.datePicker().setSelection(selecteddate)
         val constraintsBuilder: CalendarConstraints.Builder =
             CalendarConstraints.Builder().setValidator(DateListValidator(datelist))
 
         val startdate=datelist.min()!!
         val enddate=datelist.max()!!
         constraintsBuilder.setStart(startdate)
-//        enddate.set(2020, 2, 31)
         constraintsBuilder.setEnd(enddate)
+        constraintsBuilder.setOpenAt(selecteddate)
 
         builder.setCalendarConstraints(constraintsBuilder.build())
         val picker = builder.build()
@@ -287,14 +420,71 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             val selection=picker.selection as Long
             config.lastViewedDate=selection
             val ldt=DateConversion.millsToLocalDateTime(selection)
-            viewMessageFromDate(ldt!!.year, ldt.monthValue, ldt.dayOfMonth)
+            viewMessageFromDate(ldt!!.year, ldt.monthValue, ldt.dayOfMonth, true)
         }
         picker.show(supportFragmentManager, picker.toString())
     }
 
+
     private fun saveLog() {
-        Toast.makeText(this, "Not yet implemented", Toast.LENGTH_SHORT).show()
+        /*
+        val config = RealmConfiguration.Builder()
+            .name("kktviewer.realm")
+//            .encryptionKey(getMyKey())
+            .schemaVersion(0)
+            .modules(Realm.getDefaultModule())
+            .build()
+
+        val schema = realm.schema
+
+        schema.create("KKTAuthor")
+            .addField("authorId", String::class.java)
+            .addField("authorAlias", String::class.java)
+            .addField("avatarUri", String::class.java)
+
+        schema.create("KKTMessage")
+            .addField("messageId", String::class.java)
+            .addField("messageText", String::class.java)
+            .addField("author", KKTAuthor::class.java)
+            .addField("messageTime", String::class.java)
+            .addField("imgUrl", String::class.java)
+        */
+
+        val realm = Realm.getInstance(realmconfig)
+
+        if (config.useDatabase) {
+            realm.executeTransaction {
+                it.deleteAll()
+            }
+            config.useDatabase=false
+        }
+
+        realm.executeTransaction {
+            for (message in mMessageData) {
+                // date message inserted by ChatKit
+                if (message.isNull())
+                    continue
+                val m=message
+                it.copyToRealmOrUpdate(m)
+            }
+        }
+
+        // test
+//        var res: RealmResults<KKTMessage>
+//        res=realm.where(KKTMessage::class.java).findAll()
+//        var resarr=ArrayList<KKTMessage>()
+//        resarr.addAll(res.subList(0, res.size))
+//        for (item in resarr) {
+//            Log.d("mike", "${item.author}")
+//        }
+
+        config.useDatabase=true
+
+        toggleMenuItemEnabled(R.id.saveLog, false)
+
+        Toast.makeText(this, "Successfully saved", Toast.LENGTH_SHORT)
     }
+
 
     private fun openLog(uri:Uri) {
         mMessageData=KKTChatLogReader(this).readTextLog(uri, config.authorId)
@@ -302,7 +492,12 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         adapter.clear()
         adapter.addToEnd(mMessageData, true)
         adapter.notifyDataSetChanged()
+
+        for (item in listOf(R.id.saveLog, R.id.moveToDay, R.id.findMessage)) {
+            toggleMenuItemEnabled(item, mMessageData.isNotEmpty())
+        }
     }
+
 
     private fun initSampleData() {
         var msgList:List<KKTMessage> = KKTChatLogReader(this).readTextLog(null, config.authorId)
@@ -332,6 +527,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         var intent: Intent = Intent()
             .setType("text/*")
             .setAction(Intent.ACTION_GET_CONTENT)
+//            .setData(Uri.parse(config.lastOpenedFile))
 
         startActivityForResult(Intent.createChooser(intent, "Select a file"), REQUEST_CODE_IMPORT_TEXT)
     }
@@ -341,6 +537,12 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
             REQUEST_CODE_IMPORT_TEXT -> {
+                if (resultCode == Activity.RESULT_OK && data != null) {
+                    var uri: Uri? = data.data ?: return
+                    openLog(uri!!)
+                }//The uri with the location of the file
+            }
+            REQUEST_CODE_OPEN_DB -> {
                 if (resultCode == Activity.RESULT_OK && data != null) {
                     var uri: Uri? = data.data ?: return
                     openLog(uri!!)

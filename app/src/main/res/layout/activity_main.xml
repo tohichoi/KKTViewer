@@ -6,12 +6,48 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-
-    <com.stfalcon.chatkit.messages.MessagesList
-        android:id="@+id/messagesList"
-        style="@style/MessagesList"
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent">
 
+        <com.stfalcon.chatkit.messages.MessagesList
+            android:id="@+id/messagesListView"
+            style="@style/MessagesListView"
+            android:scrollbars="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </RelativeLayout>
+
+
+    <RelativeLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_margin="@dimen/fab_margin"
+        android:layout_gravity="start|bottom" >
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_up"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@+id/fab_down"
+            android:layout_alignParentStart="true"
+            android:layout_gravity="start|bottom"
+            android:layout_marginBottom="@dimen/fab_margin"
+            android:alpha="128"
+            android:src="@drawable/keyboard_arrow_up"
+            app:fabSize="mini" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_down"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignStart="@+id/fab_up"
+            android:layout_alignParentBottom="true"
+            android:layout_gravity="start|bottom"
+            android:alpha="128"
+            android:src="@drawable/keyboard_arrow_down"
+            app:fabSize="mini" />
+    </RelativeLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

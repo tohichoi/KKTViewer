@@ -1,12 +1,14 @@
 package com.soonsim.kktlogviewer
 
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
+import android.provider.MediaStore
 import android.util.Log
+import androidx.loader.content.CursorLoader
 import java.io.*
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.*
@@ -14,19 +16,47 @@ import java.util.*
 
 class KKTChatLogReader(private val context: Context) {
 
-    fun readTextLog(uri: Uri?, myName:String?) : List<KKTMessage> {
+    fun readTextLog(uri: Uri?, myName:String?) : ArrayList<KKTMessage> {
         return KKTChatTextReader(context, null, myName).readFile(uri)
     }
 }
 
 class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private val myName:String?) {
 
+    var dataDirectory:String=""
+
     companion object {
         val TIME_PATTERN = """(\d{4})년 (\d{1,2})월 (\d{1,2})일 (오후|오전) (\d{1,2}):(\d{1,2})"""
         val MESSAGE_PATTERN = """, ([^:]+) : (.+)$"""
+        val IMAGE_PATTERN="""(jpg|jpeg|gif|bmp|png|tif|tiff|tga|psd|ai)$"""
+        val VIDEO_PATTERN="""(mp4|m4v|avi|asf|wmv|mkv|ts|mpg|mpeg|mov|flv|ogv)$"""
+        val AUDIO_PATTERN="""(mp3|wav|flac|tta|tak|aac|wma|ogg|m4a)$"""
+        val NAME_PATTERN="""[a-hA-H0-9]{64}\."""
+        val DATA_PATTERN="""[a-zA-Z0-9]+$"""
+        val patarr=listOf(
+            Pair(FileType.IMAGE, NAME_PATTERN+IMAGE_PATTERN),
+            Pair(FileType.VIDEO, NAME_PATTERN+VIDEO_PATTERN),
+            Pair(FileType.AUDIO, NAME_PATTERN+AUDIO_PATTERN),
+            Pair(FileType.DATA, NAME_PATTERN+DATA_PATTERN))
+
+        enum class FileType {
+            IMAGE, VIDEO, AUDIO, DATA, NONE
+        }
 
         enum class LineType {
             HEADER, SAVING_TIME, CHUNK_START, MESSAGE, MESSAGE_CONTINUED, NONE
+        }
+
+        fun parseMedia(text:String) : Pair<FileType, String?> {
+            var res1:MatchResult?
+
+            for (item in patarr) {
+                res1=Regex(item.second).find(text)
+                if (res1 != null)
+                    return Pair(item.first, text.trim())
+            }
+
+            return Pair(FileType.NONE, null)
         }
 
         fun parseDateTimeExpr(line:String) : Pair<Date, Int>? {
@@ -90,7 +120,7 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
     }
 
 
-    public fun readFile(uri:Uri?=null) : List<KKTMessage> {
+    public fun readFile(uri:Uri?=null) : ArrayList<KKTMessage> {
         val messageList=ArrayList<KKTMessage>()
         var count = 0
         var chunkcount = 0
@@ -101,11 +131,13 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
         var nick=""
         var prevlt:LineType = LineType.NONE
 
-        if (uri?.scheme.equals("file")) {
+        dataDirectory=File(uri?.path!!).parent!!
+
+        if (uri.scheme.equals("file")) {
             f = File(uri.toString())
             ins = FileInputStream(f)
         } else {
-            ins = context.contentResolver.openInputStream(uri!!)
+            ins = context.contentResolver.openInputStream(uri)
         }
 
         var message=KKTMessage()
@@ -180,7 +212,7 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
             Log.d("mike", "Chuck count = $chunkcount")
         }
 
-        return messageList.toList()
+        return messageList
     }
 
     private fun insertMessage(messageList:ArrayList<KKTMessage>, time: Date, nick: String, text: String) {
@@ -188,7 +220,19 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
         val name=if (myName != null && nick=="회원님") myName else nick
         val author=KKTAuthor(name, name, null)
 //        val message=KKTMessage(msgId, text.trim(), author, time)
-        val message=KKTMessage(msgId, "[$msgId] " + text.trim(), author, time)
+        var newtext=text.trim()
+        val fileinfo=parseMedia(text)
+        if (fileinfo.first != FileType.NONE) {
+            // filename --> uri
+//            newtext=uri.toString()
+            val f=File(dataDirectory, fileinfo.second)
+            if (f.exists()) {
+                newtext=f.toURI().toString()
+            }
+        }
+
+//        val message=KKTMessage(msgId, "[$msgId] $newtext", author, time)
+        val message=KKTMessage(msgId, newtext, author, time)
 
         messageList.add(message)
 
@@ -213,16 +257,16 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
     }
 
 
-    public fun readFolder(uri:Uri?=null) : List<KKTMessage> {
-        val messageList=emptyList<KKTMessage>().toMutableList()
+    public fun readFolder(uri:Uri?=null) : ArrayList<KKTMessage> {
+        val messageList=ArrayList<KKTMessage>()
 
         messageList.addAll(getDummyMessage())
 
         return messageList
     }
 
-    private fun getDummyMessage() : List<KKTMessage> {
-        val messageList=emptyList<KKTMessage>().toMutableList()
+    private fun getDummyMessage() : ArrayList<KKTMessage> {
+        val messageList=ArrayList<KKTMessage>()
 
         for (i in 0..10) {
             val msg=KKTMessage.random()

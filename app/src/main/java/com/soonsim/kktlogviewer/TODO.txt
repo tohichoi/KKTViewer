@@ -1,0 +1,46 @@
+• DB로 저장, DB로 읽기 : plugin 설정이 정확하게 되어있지 않았음(kotlin-kapt)
+  - apply plugin: 'com.android.application'
+    apply plugin: 'kotlin-android'
+    apply plugin: 'kotlin-android-extensions'
+    apply plugin: 'kotlin-kapt'
+    apply plugin: 'realm-android'
+
+• DONE 날짜 이동 시 오늘 페이지가 나옴. 선택된 페이지가 처음에 표시되도록 변경
+  - constraintsBuilder.setOpenAt(selecteddate)
+
+• DONE 아이콘 disable 상태 변경
+  - @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+
+        MenuItem item = menu.findItem(R.id.menu_my_item);
+
+        if (myItemShouldBeEnabled) {
+            item.setEnabled(true);
+            item.getIcon().setAlpha(255);
+        } else {
+            // disabled
+            item.setEnabled(false);
+            item.getIcon().setAlpha(130);
+        }
+    }
+
+• DATE HEADER 포맷 변경
+  -     class KKTDateFormatter : DateFormatter.Formatter {
+            override fun format(date: Date?): String {
+                return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
+            }
+        }
+        adapter.setDateHeadersFormatter(KKTDateFormatter())
+
+
+• DONE 버블 색깔 변경 (dark)
+
+• Navigator 만들기
+  - 날짜 단위로 스크롤
+  - Floating action button
+    - 위 화살표, 아래 화살표
+  - scroll 중이면 사라짐
+  - 멈춰 있으면 보임
+
+• 이미지 로딩
+• 스크롤바 추가

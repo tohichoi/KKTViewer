@@ -1,9 +1,16 @@
 package com.soonsim.kktlogviewer
 
 import com.stfalcon.chatkit.commons.models.IUser
+import io.realm.RealmObject
 
 
-class KKTAuthor(var authorId:String, var authorAlias:String, var avatarUri:String?) : IUser {
+open class KKTAuthor(var authorId:String="Unknown", var authorAlias:String="Unknown", var avatarUri:String?=null) : IUser, RealmObject() {
+
+    constructor(author:KKTAuthor) : this() {
+        authorId=author.authorId
+        authorAlias=author.authorAlias
+        avatarUri=author.avatarUri
+    }
 
     override fun getId(): String {
         return authorId

@@ -21,4 +21,12 @@ class KKTConfig(context: Context) {
     var authorId: String
         get() = prefs.getString("authorId", "")!!
         set(authorId) = prefs.edit().putString("authorId", authorId).apply()
+
+    var lastOpenedFile: String
+        get() = prefs.getString("lastOpenedFile", "")!!
+        set(lastOpenedFile) = prefs.edit().putString("lastOpenedFile", authorId).apply()
+
+    var useDatabase: Boolean
+        get() = prefs.getBoolean("useDatabase", false)
+        set(dbCreated) = prefs.edit().putBoolean("useDatabase", dbCreated).apply()
 }

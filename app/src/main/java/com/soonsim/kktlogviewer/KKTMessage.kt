@@ -1,9 +1,27 @@
 package com.soonsim.kktlogviewer
 import com.stfalcon.chatkit.commons.models.IMessage
+import com.stfalcon.chatkit.commons.models.MessageContentType
+import io.realm.RealmObject
+import io.realm.annotations.LinkingObjects
+import io.realm.annotations.PrimaryKey
 import java.util.*
 
 
-class KKTMessage(var messageId:String?=null, var messageText:String?=null, var author:KKTAuthor?=null, var messageTime:Date?=null) : IMessage {
+open class KKTMessage(
+    @PrimaryKey
+    var messageId:String?=null,
+    var messageText:String?=null,
+    var author:KKTAuthor?=null,
+    var messageTime:Date?=null,
+    var imgUrl:String?=null) : IMessage, MessageContentType.Image, RealmObject() {
+
+    constructor(message:KKTMessage) : this() {
+        messageId=message.messageId
+        messageText=message.messageText
+        author=message.author
+        messageTime=message.messageTime
+        imgUrl=message.imgUrl
+    }
 
     override fun getId(): String? {
         return messageId
@@ -23,6 +41,14 @@ class KKTMessage(var messageId:String?=null, var messageText:String?=null, var a
 
     override fun toString() : String {
         return "$messageTime, $author : $messageText\n"
+    }
+
+    override fun getImageUrl() : String? {
+        return imgUrl
+    }
+
+    fun isNull() : Boolean {
+        return messageId==null || messageTime==null
     }
 
     companion object {

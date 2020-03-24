@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">KKTLogViewer</string>
+    <string name="DEFAULT_AUTHOR_ID">회원님</string>
 </resources>
