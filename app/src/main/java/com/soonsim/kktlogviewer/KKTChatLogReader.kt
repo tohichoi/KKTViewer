@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
 import androidx.loader.content.CursorLoader
+import org.apache.commons.lang3.time.DateUtils
 import java.io.*
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -38,6 +39,7 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
             Pair(FileType.VIDEO, NAME_PATTERN+VIDEO_PATTERN),
             Pair(FileType.AUDIO, NAME_PATTERN+AUDIO_PATTERN),
             Pair(FileType.DATA, NAME_PATTERN+DATA_PATTERN))
+        var messageTime=1
 
         enum class FileType {
             IMAGE, VIDEO, AUDIO, DATA, NONE
@@ -166,6 +168,7 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
                     // Pair(LineType.CHUNK_START, Date)
                     LineType.CHUNK_START -> {
                         chunkcount++
+                        messageTime=1
                         val chatChunkTime=res.second
                         if (prevlt == LineType.MESSAGE) {
                             val res2= parseDateTimeExpr(line)
@@ -232,6 +235,7 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
         }
 
 //        val message=KKTMessage(msgId, "[$msgId] $newtext", author, time)
+        DateUtils.addMilliseconds(time, messageTime++)
         val message=KKTMessage(msgId, newtext, author, time)
 
         messageList.add(message)

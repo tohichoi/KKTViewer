@@ -75,10 +75,11 @@ public class MessagesListAdapter<MESSAGE extends IMessage>
     protected static boolean isSelectionModeEnabled;
 
     public List<Wrapper> items;
+    public String currentQuery="";
     private MessageHolders holders;
     private String senderId;
     private TreeMap<Date, Integer> dates = new TreeMap<Date, Integer>(new DateComparator());
-
+    public int dateHeaderHeight = 0;
     private int selectedItemsCount;
     private SelectionListener selectionListener;
 
@@ -132,6 +133,12 @@ public class MessagesListAdapter<MESSAGE extends IMessage>
                 getMessageLongClickListener(wrapper),
                 dateHeadersFormatter,
                 viewClickListenersArray);
+        if (wrapper.item instanceof Date) {
+            View view=((MessageHolders.DefaultDateHeaderViewHolder) holder).itemView.findViewById(R.id.messageText);
+            view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+            int width = view.getMeasuredWidth();
+            dateHeaderHeight = view.getMeasuredHeight();
+        }
     }
 
     @Override

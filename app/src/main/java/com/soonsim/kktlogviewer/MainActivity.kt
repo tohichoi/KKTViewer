@@ -1,19 +1,24 @@
 package com.soonsim.kktlogviewer
 
+import android.animation.ObjectAnimator
 import android.app.Activity
 import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.util.TypedValue
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.datepicker.CalendarConstraints
@@ -26,7 +31,10 @@ import com.stfalcon.chatkit.messages.MessagesListAdapter.HoldersConfig
 import com.stfalcon.chatkit.utils.DateFormatter
 import io.realm.*
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.android.synthetic.main.item_custom_date_header.*
 import kotlinx.android.synthetic.main.item_custom_date_header.view.*
+import kotlinx.android.synthetic.main.item_custom_date_header.view.messageText
+import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.time.DateUtils
 import java.lang.Integer.max
 import java.lang.Integer.min
@@ -44,10 +52,9 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     private var mMessageData=ArrayList<KKTMessage>()
     lateinit var adapter:MessagesListAdapter<KKTMessage>
     private var selectionCount = 0
-    private var scrollTriggered = false
     private lateinit var realmconfig: RealmConfiguration
     private var mMenu:Menu?=null
-
+    private var searchVisible:Boolean=false
 
     class KKTDateFormatter : DateFormatter.Formatter {
         override fun format(date: Date?): String {
@@ -58,6 +65,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+//        setSupportActionBar(toolbar)
 
         initData()
 
@@ -71,6 +79,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         val holdersConfig = HoldersConfig()
         holdersConfig.setDateHeaderLayout(R.layout.item_custom_date_header)
 
+//        val holder=
         adapter=MessagesListAdapter<KKTMessage>(config.authorId, holdersConfig, imageLoader)
         adapter.setDateHeadersFormatter(KKTDateFormatter())
 
@@ -154,7 +163,81 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
                     viewMessageFromDate(date, false)
             }
         }
+
+        query.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(charSequence: CharSequence, i: Int, i1: Int, i2: Int) {}
+
+            override fun onTextChanged(charSequence: CharSequence, i: Int, i1: Int, i2: Int) {
+                refreshList(charSequence.toString())
+            }
+
+            override fun afterTextChanged(editable: Editable) {}
+        })
+
+        clearQuery.setOnClickListener {
+            query.text = null
+            refreshList("")
+        }
     }
+
+    fun refreshList(query: String) {
+        val realm=Realm.getInstance(realmconfig)
+        if (!config.useDatabase || realm.isClosed || realm.isEmpty)
+            return
+
+        val results: RealmResults<KKTMessage> = when (StringUtils.isEmpty(query)) {
+            true -> {
+                realm.where(KKTMessage::class.java)
+                    .findAll().sort(arrayOf("messageTime"), arrayOf(Sort.DESCENDING))
+            }
+            false -> {
+                realm.where(KKTMessage::class.java)
+                    .contains("messageText", query, Case.INSENSITIVE)
+                    .findAll().sort(arrayOf("messageTime"), arrayOf(Sort.DESCENDING))
+            }
+        }
+
+        mMessageData.clear()
+        mMessageData.addAll(results.subList(0, results.size))
+//        for (item in l) {
+//            Log.d("mike", "item: ${item.toString()}")
+//        }
+
+        adapter.clear()
+        adapter.addToEnd(mMessageData, true)
+        adapter.notifyDataSetChanged()
+        adapter.currentQuery = query
+    }
+
+
+    private fun toggleFilterView(isVisible: Boolean) {
+
+//        mFirstTouch = 0F
+        val height = if (isVisible) 0F else searchCard.height.toFloat().unaryMinus()
+        /*
+        if (!isVisible) {
+            this.currentFocus?.let { focusView ->
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.hideSoftInputFromWindow(focusView.windowToken, 0)
+            }
+        }
+         */
+
+        if (!isVisible)
+            searchCard.visibility=View.GONE
+        else
+            searchCard.visibility=View.VISIBLE
+
+        /*
+        ObjectAnimator.ofFloat(searchCard, "translationY", height).apply {
+            duration = 700
+            start()
+        }
+        */
+//        searchCard.visibility=if (isVisible) View.VISIBLE else View.GONE
+//        contents.invalidate()
+    }
+
 
     private fun getDateOfItem(pos:Int) : Date? {
         var date:Date?=null
@@ -260,7 +343,9 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             val llm=(messagesListView.layoutManager as LinearLayoutManager)
 
             val vdate=messagesListView.findViewHolderForAdapterPosition(datePos)
-            val offset=messagesListView.bottom - spToPx(resources.getDimension(R.dimen.message_date_header_text_size), this)
+//            val dateheadersize=if (adapter.dateHeaderHeight==0) spToPx(resources.getDimension(R.dimen.message_date_header_text_size), this) else adapter.dateHeaderHeight
+            val dateheadersize=adapter.dateHeaderHeight
+            val offset=messagesListView.bottom - dateheadersize
             llm.scrollToPositionWithOffset(absDatePos, offset)
         }
     }
@@ -348,6 +433,11 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             }
             R.id.moveToDay -> {
                 getDateFromUser()
+                true
+            }
+            R.id.findMessage -> {
+                searchVisible = !searchVisible
+                toggleFilterView(searchVisible)
                 true
             }
             else -> {

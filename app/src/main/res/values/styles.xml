@@ -4,13 +4,15 @@
     <style name="AppTheme" parent="Theme.MaterialComponents.DayNight">
         <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorSecondary">@color/colorSecondary</item>
-        <item name="colorAccent">@color/colorPrimaryAccent</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
     </style>
 
     <style name="AppTheme.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
+        <item name="android:fastScrollThumbDrawable">@drawable/unfold_more</item>
+        <item name="android:fastScrollTrackDrawable">@null</item>
     </style>
 
     <style name="AppTheme.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
@@ -21,22 +23,34 @@
         <item name="incomingBubblePaddingTop">@dimen/text_padding</item>
         <item name="incomingBubblePaddingBottom">@dimen/text_padding</item>
         <item name="incomingTextColor">@android:color/primary_text_dark</item>
-        <item name="incomingDefaultBubbleColor">#ff666666</item>
+        <item name="incomingDefaultBubbleColor">#ff333333</item>
+        <item name="incomingDefaultBubblePressedColor">@color/colorPrimaryAccent</item>
+        <item name="incomingDefaultBubbleSelectedColor">@color/colorPrimaryAccent</item>
         <item name="outcomingBubblePaddingTop">@dimen/text_padding</item>
         <item name="outcomingBubblePaddingBottom">@dimen/text_padding</item>
         <item name="outcomingTextColor">@android:color/primary_text_dark</item>
-        <item name="outcomingDefaultBubbleColor">#ff333333</item>
+        <item name="outcomingDefaultBubbleColor">#ff222222</item>
+        <item name="dateHeaderTextColor">@color/colorPrimaryAccent</item>
+        <item name="dateHeaderTextSize">@dimen/message_date_header_text_size</item>
+        <item name="dateHeaderTextStyle">bold</item>
     </style>
 
     <style name="DateHeader">
-        <item name="android:textSize">@dimen/message_date_header_text_size</item>
-        <item name="android:textColor">#ffff0000</item>
+<!--        // should be defined in "MessageListView"-->
         <item name="dateHeaderTextColor">@color/colorPrimaryAccent</item>
-        <item name="android:colorBackground">@android:color/background_dark</item>
-<!--        <item name="android:backgr">@android:color/background_dark</item>-->
+        <item name="dateHeaderTextSize">@dimen/message_date_header_text_size</item>
+        <item name="dateHeaderTextStyle">bold</item>
         <item name="android:padding">16dp</item>
         <item name="android:paddingTop">32dp</item>
-        <item name="android:textStyle">bold</item>
+        <!--        <item name="android:textStyle">bold</item>-->
+        <!--        <item name="android:backgr">@android:color/background_dark</item>-->
+    </style>
+
+    <style name="image_view_custom_toolbar_icon">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:padding">5dp</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
     </style>
 
 
