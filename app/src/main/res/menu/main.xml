@@ -3,15 +3,9 @@
     xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/openLog"
-        android:icon="@drawable/ic_menu_note_add"
-        android:title="Open log..."
-        app:showAsAction="always" />
-
-    <item
-        android:id="@+id/saveLog"
-        android:icon="@drawable/save"
-        android:title="Save"
+        android:id="@+id/findMessage"
+        android:icon="@drawable/pageview"
+        android:title="Find ..."
         app:showAsAction="always" />
 
     <item
@@ -21,9 +15,15 @@
         app:showAsAction="always" />
 
     <item
-        android:id="@+id/findMessage"
-        android:icon="@drawable/pageview"
-        android:title="Find ..."
+        android:id="@+id/openLog"
+        android:icon="@drawable/ic_menu_note_add"
+        android:title="Open log..."
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/saveLog"
+        android:icon="@drawable/save"
+        android:title="Save"
         app:showAsAction="always" />
 
 </menu>

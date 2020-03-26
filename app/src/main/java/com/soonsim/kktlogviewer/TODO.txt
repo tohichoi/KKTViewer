@@ -3,6 +3,7 @@
 • 스크롤바 추가
 
 • DONE 메시지 작성시간이 같은 minute 일 때 sorting 안되는 문제 수정
+  - val message=KKTMessage(msgId, newtext, author, DateUtils.addMilliseconds(time, messageTime++))
 
 • importing 시 progressbar
 

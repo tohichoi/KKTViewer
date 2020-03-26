@@ -1,11 +1,11 @@
 package com.soonsim.kktlogviewer
 
+import android.annotation.SuppressLint
 import android.content.Context
-import android.database.Cursor
 import android.net.Uri
-import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.util.Log
-import androidx.loader.content.CursorLoader
+import androidx.core.content.FileProvider
 import org.apache.commons.lang3.time.DateUtils
 import java.io.*
 import java.time.LocalDateTime
@@ -15,16 +15,36 @@ import java.time.format.DateTimeParseException
 import java.util.*
 
 
-class KKTChatLogReader(private val context: Context) {
+//class KKTChatLogReader(private val context: Context) {
+//
+//    interface OnProgressListener {
+//        fun onProgressChanged(position:Int, totalCount: Int)
+//    }
+//
+//    var prog:OnProgressListener=null
+//
+//    fun readTextLog(uri: Uri?, myName:String?) : ArrayList<KKTMessage> {
+//        return KKTChatTextReader(context, null, myName).readFile(uri)
+//    }
+//
+//    fun setOnProgressChanged(onProgressListener:OnProgressListener) {
+//        prog=onProgressListener
+//    }
+//}
 
-    fun readTextLog(uri: Uri?, myName:String?) : ArrayList<KKTMessage> {
-        return KKTChatTextReader(context, null, myName).readFile(uri)
+class KKTChatTextReader(private val context: Context, private val myName:String?) {
+
+    interface OnProgressListener {
+        fun onProgressChanged(position:Long, totalCount: Long)
     }
-}
-
-class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private val myName:String?) {
 
     var dataDirectory:String=""
+    var uri:Uri?=null
+    var prog: OnProgressListener? = null
+
+    fun setOnProgressChanged(onProgressChanged: OnProgressListener) {
+        prog=onProgressChanged
+    }
 
     companion object {
         val TIME_PATTERN = """(\d{4})년 (\d{1,2})월 (\d{1,2})일 (오후|오전) (\d{1,2}):(\d{1,2})"""
@@ -132,8 +152,16 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
         var time:Date?=null
         var nick=""
         var prevlt:LineType = LineType.NONE
+        var filesize=0L
+        var readsize=0L
 
         dataDirectory=File(uri?.path!!).parent!!
+
+        val cursor=context.contentResolver.query(uri, null, null, null, null)
+        val sizeIndex=cursor!!.getColumnIndex(OpenableColumns.SIZE)
+        cursor.moveToFirst()
+        filesize=cursor.getLong(sizeIndex)
+        cursor.close()
 
         if (uri.scheme.equals("file")) {
             f = File(uri.toString())
@@ -154,6 +182,9 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
                     }
                     break
                 }
+
+                readsize+=line.length
+                prog?.onProgressChanged(readsize, filesize)
 
                 val res=getLineType(line)
                 when (res.first) {
@@ -212,7 +243,8 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
             Thread.currentThread().interrupt()
         } finally {
             br.close()
-            Log.d("mike", "Chuck count = $chunkcount")
+            prog?.onProgressChanged(filesize, filesize)
+//            Log.d("mike", "Chuck count = $chunkcount")
         }
 
         return messageList
@@ -235,8 +267,7 @@ class KKTChatTextReader(private val context: Context, val uri:Uri?=null, private
         }
 
 //        val message=KKTMessage(msgId, "[$msgId] $newtext", author, time)
-        DateUtils.addMilliseconds(time, messageTime++)
-        val message=KKTMessage(msgId, newtext, author, time)
+        val message=KKTMessage(msgId, newtext, author, DateUtils.addMilliseconds(time, messageTime++))
 
         messageList.add(message)
 

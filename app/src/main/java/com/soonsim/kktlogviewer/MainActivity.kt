@@ -1,6 +1,5 @@
 package com.soonsim.kktlogviewer
 
-import android.animation.ObjectAnimator
 import android.app.Activity
 import android.app.DatePickerDialog
 import android.content.Context
@@ -14,11 +13,15 @@ import android.util.TypedValue
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
-import android.widget.TextView
+import android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
+import android.widget.ProgressBar
+import android.widget.RelativeLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.isVisible
+import androidx.core.widget.doOnTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.datepicker.CalendarConstraints
@@ -31,9 +34,6 @@ import com.stfalcon.chatkit.messages.MessagesListAdapter.HoldersConfig
 import com.stfalcon.chatkit.utils.DateFormatter
 import io.realm.*
 import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.android.synthetic.main.item_custom_date_header.*
-import kotlinx.android.synthetic.main.item_custom_date_header.view.*
-import kotlinx.android.synthetic.main.item_custom_date_header.view.messageText
 import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.time.DateUtils
 import java.lang.Integer.max
@@ -55,6 +55,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     private lateinit var realmconfig: RealmConfiguration
     private var mMenu:Menu?=null
     private var searchVisible:Boolean=false
+    val onProgressListener=MyOnProgressListener()
 
     class KKTDateFormatter : DateFormatter.Formatter {
         override fun format(date: Date?): String {
@@ -62,24 +63,27 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         }
     }
 
+    inner class MyOnProgressListener : KKTChatTextReader.OnProgressListener {
+        override fun onProgressChanged(position: Long, totalCount: Long) {
+//                Log.d("mike", "$position, $totalCount")
+            runOnUiThread {
+                progressBar.progress = position.toInt()
+                progressBar.max = totalCount.toInt()
+                progressText.text = "$position/$totalCount"
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-//        setSupportActionBar(toolbar)
+        setSupportActionBar(toolbar)
 
         initData()
-
-        // default conf
-//        Realm.init(this)
-//        realmconfig = RealmConfiguration.Builder()
-//            .name("myrealm.realm")
-//            .build()
-//        Realm.setDefaultConfiguration(realmconfig)
 
         val holdersConfig = HoldersConfig()
         holdersConfig.setDateHeaderLayout(R.layout.item_custom_date_header)
 
-//        val holder=
         adapter=MessagesListAdapter<KKTMessage>(config.authorId, holdersConfig, imageLoader)
         adapter.setDateHeadersFormatter(KKTDateFormatter())
 
@@ -95,11 +99,11 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             mMessageData.addAll(realm.where(KKTMessage::class.java).sort("messageTime").findAll())
             adapter.clear()
             adapter.addToEnd(mMessageData, true)
-//            adapter.notifyDataSetChanged()
         }
 
-        messagesListView.setAdapter(adapter)
+//        progressBarHolder.visibility=View.GONE
 
+        messagesListView.setAdapter(adapter)
         messagesListView.addOnScrollListener(object: RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 super.onScrollStateChanged(recyclerView, newState)
@@ -117,13 +121,6 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             }
         })
 
-        /*
-        val input = findViewById<MessageInput>(R.id.input)
-        input.setInputListener(this)
-        input.setTypingListener(this)
-        input.setAttachmentsListener(this)
-
-         */
 
         fab_up.setOnLongClickListener(object: View.OnLongClickListener {
             override fun onLongClick(v: View?): Boolean {
@@ -164,20 +161,32 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             }
         }
 
-        query.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(charSequence: CharSequence, i: Int, i1: Int, i2: Int) {}
-
-            override fun onTextChanged(charSequence: CharSequence, i: Int, i1: Int, i2: Int) {
-                refreshList(charSequence.toString())
-            }
-
-            override fun afterTextChanged(editable: Editable) {}
-        })
-
-        clearQuery.setOnClickListener {
-            query.text = null
-            refreshList("")
+        query.editText?.doOnTextChanged { text, start, count, after ->
+            refreshList(text.toString())
         }
+
+        query.editText?.setOnEditorActionListener { v, actionId, event ->
+            if (actionId==EditorInfo.IME_ACTION_DONE) {
+                toggleFilterView(false)
+                true
+            }
+            false
+        }
+
+//        query.addTextChangedListener(object : TextWatcher {
+//            override fun beforeTextChanged(charSequence: CharSequence, i: Int, i1: Int, i2: Int) {}
+//
+//            override fun onTextChanged(charSequence: CharSequence, i: Int, i1: Int, i2: Int) {
+//                refreshList(charSequence.toString())
+//            }
+//
+//            override fun afterTextChanged(editable: Editable) {}
+//        })
+
+//        clearQuery.setOnClickListener {
+//            query.text = null
+//            refreshList("")
+//        }
     }
 
     fun refreshList(query: String) {
@@ -188,12 +197,12 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         val results: RealmResults<KKTMessage> = when (StringUtils.isEmpty(query)) {
             true -> {
                 realm.where(KKTMessage::class.java)
-                    .findAll().sort(arrayOf("messageTime"), arrayOf(Sort.DESCENDING))
+                    .findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING))
             }
             false -> {
                 realm.where(KKTMessage::class.java)
                     .contains("messageText", query, Case.INSENSITIVE)
-                    .findAll().sort(arrayOf("messageTime"), arrayOf(Sort.DESCENDING))
+                    .findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING))
             }
         }
 
@@ -213,20 +222,31 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     private fun toggleFilterView(isVisible: Boolean) {
 
 //        mFirstTouch = 0F
-        val height = if (isVisible) 0F else searchCard.height.toFloat().unaryMinus()
-        /*
+        val height = if (isVisible) 0F else query.height.toFloat().unaryMinus()
+//        if (!isVisible) {
+//            this.currentFocus?.let { focusView ->
+//                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+//                imm.hideSoftInputFromWindow(focusView.windowToken, 0)
+//            }
+//        }
+//
         if (!isVisible) {
-            this.currentFocus?.let { focusView ->
-                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                imm.hideSoftInputFromWindow(focusView.windowToken, 0)
-            }
+            query.visibility = View.GONE
         }
-         */
+        else {
+            query.visibility = View.VISIBLE
+            query.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(query, SHOW_IMPLICIT)
 
-        if (!isVisible)
-            searchCard.visibility=View.GONE
-        else
-            searchCard.visibility=View.VISIBLE
+//            /*
+//            val llm=(messagesListView.layoutManager as LinearLayoutManager)
+//            messagesListView.top=query.height
+//            messagesListView.requestLayout()
+//             */
+        }
+
+//        contents.addView(myCustomView)
 
         /*
         ObjectAnimator.ofFloat(searchCard, "translationY", height).apply {
@@ -334,7 +354,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         if (idx < 0)
             Toast.makeText(this, "Cannot find message", Toast.LENGTH_SHORT).show()
         else {
-            Log.d("mike", "Found position: ${md[idx]}")
+//            Log.d("mike", "Found position: ${md[idx]}")
             val startIdx=getStartIndexOfDay(idx, toBeginning)
             val datePos=adapter.getDateHeaderPosition(md[startIdx].createdAt)
 
@@ -577,21 +597,39 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
 
     private fun openLog(uri:Uri) {
-        mMessageData=KKTChatLogReader(this).readTextLog(uri, config.authorId)
-        config.lastViewedDate=0L
-        adapter.clear()
-        adapter.addToEnd(mMessageData, true)
-        adapter.notifyDataSetChanged()
+        val runnable= Runnable {
+            val reader=KKTChatTextReader(this, config.authorId)
+            reader.setOnProgressChanged(onProgressListener)
 
-        for (item in listOf(R.id.saveLog, R.id.moveToDay, R.id.findMessage)) {
-            toggleMenuItemEnabled(item, mMessageData.isNotEmpty())
+            runOnUiThread{
+                progressBarHolder.visibility=View.VISIBLE
+            }
+
+            mMessageData=reader.readFile(uri)
+
+            runOnUiThread {
+                config.lastViewedDate = 0L
+                adapter.clear()
+                adapter.addToEnd(mMessageData, true)
+                adapter.notifyDataSetChanged()
+
+                for (item in listOf(R.id.saveLog, R.id.moveToDay, R.id.findMessage)) {
+                    toggleMenuItemEnabled(item, mMessageData.isNotEmpty())
+                }
+
+                progressBarHolder.visibility=View.GONE
+            }
         }
+        val thread=Thread(runnable)
+        thread.start()
     }
 
 
     private fun initSampleData() {
-        var msgList:List<KKTMessage> = KKTChatLogReader(this).readTextLog(null, config.authorId)
+//        var msgList:List<KKTMessage> = KKTChatLogReader(this).readTextLog(null, config.authorId)
+        var msgList:List<KKTMessage> = KKTChatTextReader(this, config.authorId).readFile(null)
 
+        KKTChatTextReader
         //TODO: remove
         for (msg in msgList) {
             msg.author?.avatarUri=

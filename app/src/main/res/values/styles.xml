@@ -6,6 +6,9 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <item name="colorSecondary">@color/colorSecondary</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
     </style>
 
     <style name="AppTheme.NoActionBar">
@@ -30,7 +33,7 @@
         <item name="outcomingBubblePaddingBottom">@dimen/text_padding</item>
         <item name="outcomingTextColor">@android:color/primary_text_dark</item>
         <item name="outcomingDefaultBubbleColor">#ff222222</item>
-        <item name="dateHeaderTextColor">@color/colorPrimaryAccent</item>
+        <item name="dateHeaderTextColor">@color/colorPrimary</item>
         <item name="dateHeaderTextSize">@dimen/message_date_header_text_size</item>
         <item name="dateHeaderTextStyle">bold</item>
     </style>
