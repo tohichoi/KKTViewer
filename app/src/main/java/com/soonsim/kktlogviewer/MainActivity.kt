@@ -10,10 +10,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
 import android.util.TypedValue
-import android.view.Menu
-import android.view.MenuItem
-import android.view.View
-import android.view.ViewGroup
+import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
@@ -87,21 +84,8 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         adapter=MessagesListAdapter<KKTMessage>(config.authorId, holdersConfig, imageLoader)
         adapter.setDateHeadersFormatter(KKTDateFormatter())
 
-        Realm.init(this)
-        realmconfig = RealmConfiguration.Builder()
-            .name("kktviewer.realm")
-//            .encryptionKey(getMyKey())
-            .schemaVersion(1)
-            .migration(KKTRealmMigration())
-            .build()
-        if (config.useDatabase) {
-            val realm=Realm.getInstance(realmconfig)
-            mMessageData.addAll(realm.where(KKTMessage::class.java).sort("messageTime").findAll())
-            adapter.clear()
-            adapter.addToEnd(mMessageData, true)
-        }
-
-//        progressBarHolder.visibility=View.GONE
+        progressBarHolder.visibility=View.GONE
+        query.visibility=View.GONE
 
         messagesListView.setAdapter(adapter)
         messagesListView.addOnScrollListener(object: RecyclerView.OnScrollListener() {
@@ -173,24 +157,24 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             false
         }
 
-//        query.addTextChangedListener(object : TextWatcher {
-//            override fun beforeTextChanged(charSequence: CharSequence, i: Int, i1: Int, i2: Int) {}
-//
-//            override fun onTextChanged(charSequence: CharSequence, i: Int, i1: Int, i2: Int) {
-//                refreshList(charSequence.toString())
-//            }
-//
-//            override fun afterTextChanged(editable: Editable) {}
-//        })
-
-//        clearQuery.setOnClickListener {
-//            query.text = null
-//            refreshList("")
-//        }
+        Realm.init(this)
+        realmconfig = RealmConfiguration.Builder()
+            .name("kktviewer.realm")
+//            .encryptionKey(getMyKey())
+            .schemaVersion(1)
+            .migration(KKTRealmMigration())
+            .build()
+        if (config.useDatabase) {
+            refreshList("")
+        }
     }
 
     fun refreshList(query: String) {
-        val realm=Realm.getInstance(realmconfig)
+
+        progressBarHolder.visibility=View.VISIBLE
+        progressBar.isIndeterminate=true
+
+        val realm = Realm.getInstance(realmconfig)
         if (!config.useDatabase || realm.isClosed || realm.isEmpty)
             return
 
@@ -205,17 +189,19 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
                     .findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING))
             }
         }
-
+        val reslist=results.subList(0, results.size)
         mMessageData.clear()
-        mMessageData.addAll(results.subList(0, results.size))
-//        for (item in l) {
-//            Log.d("mike", "item: ${item.toString()}")
-//        }
+        mMessageData.addAll(reslist)
+        //        for (item in l) {
+        //            Log.d("mike", "item: ${item.toString()}")
+        //        }
 
         adapter.clear()
         adapter.addToEnd(mMessageData, true)
         adapter.notifyDataSetChanged()
         adapter.currentQuery = query
+
+        progressBarHolder.visibility=View.GONE
     }
 
 
@@ -597,12 +583,18 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
 
     private fun openLog(uri:Uri) {
-        val runnable= Runnable {
+        val offset=appBar.height + progressBarHolder.height + if (progressBar.visibility==View.VISIBLE) progressBar.height else 0
+        val toast=Toast.makeText(this, "Importing file ... ", Toast.LENGTH_SHORT)
+        toast.setGravity(Gravity.TOP, 0, offset)
+        toast.show()
+
+        val runnable = Runnable {
             val reader=KKTChatTextReader(this, config.authorId)
             reader.setOnProgressChanged(onProgressListener)
 
             runOnUiThread{
                 progressBarHolder.visibility=View.VISIBLE
+                progressBar.isIndeterminate=false
             }
 
             mMessageData=reader.readFile(uri)
@@ -618,6 +610,9 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
                 }
 
                 progressBarHolder.visibility=View.GONE
+
+                toast.setText("Imported ${mMessageData.size}} messages")
+                toast.show()
             }
         }
         val thread=Thread(runnable)

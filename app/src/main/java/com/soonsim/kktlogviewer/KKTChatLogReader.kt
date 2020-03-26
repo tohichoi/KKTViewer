@@ -157,11 +157,16 @@ class KKTChatTextReader(private val context: Context, private val myName:String?
 
         dataDirectory=File(uri?.path!!).parent!!
 
-        val cursor=context.contentResolver.query(uri, null, null, null, null)
-        val sizeIndex=cursor!!.getColumnIndex(OpenableColumns.SIZE)
-        cursor.moveToFirst()
-        filesize=cursor.getLong(sizeIndex)
-        cursor.close()
+        // method 1: wrong size returned
+//        val cursor=context.contentResolver.query(uri, null, null, null, null)
+//        val sizeIndex=cursor!!.getColumnIndex(OpenableColumns.SIZE)
+//        cursor.moveToFirst()
+//        filesize=cursor.getLong(sizeIndex)
+//        cursor.close()
+        // method 2:
+        val fd = context.contentResolver.openFileDescriptor(uri, "r")
+        filesize = fd!!.statSize
+        fd.close()
 
         if (uri.scheme.equals("file")) {
             f = File(uri.toString())
@@ -174,7 +179,7 @@ class KKTChatTextReader(private val context: Context, private val myName:String?
         val br: BufferedReader = BufferedReader(InputStreamReader(ins!!, "UTF-8"))
 
         try {
-            loop@ while (true) {
+            loop@ while (!Thread.interrupted()) {
                 val line = br.readLine()
                 if (line == null) {
                     if (prevlt == LineType.MESSAGE) {
