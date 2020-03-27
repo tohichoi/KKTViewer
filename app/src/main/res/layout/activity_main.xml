@@ -23,11 +23,11 @@
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/query"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
+            android:layout_height="wrap_content"
             app:endIconMode="clear_text"
             app:layout_scrollFlags="scroll|snap|enterAlways"
             android:visibility="visible"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
             android:hint="Find...">
 
             <com.google.android.material.textfield.TextInputEditText
