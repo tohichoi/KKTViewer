@@ -14,39 +14,36 @@
     <style name="AppTheme.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
-        <item name="android:fastScrollThumbDrawable">@drawable/unfold_more</item>
-        <item name="android:fastScrollTrackDrawable">@null</item>
     </style>
 
     <style name="AppTheme.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
 
     <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
-<!--    CUSTOMIZE MATERIAL THEME-->
-<!--    <style name="AppTheme.TextInputEditText" parent="ThemeOverlay.MaterialComponents.TextInputEditText">-->
-<!--        <item name="materialThemeOverlay">@style/ThemeOverlay.MaterialComponents.TextInputEditText</item>-->
-<!--        <item name="android:textSize">14sp</item>-->
-<!--        <item name="hintTextAppearance">@style/HintTextAppearance</item>-->
-<!--    </style>-->
-<!--    <style name="AppTheme.TextInputLayout.OutlinedBox" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">-->
-<!--        <item name="materialThemeOverlay">@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox</item>-->
-<!--        <item name="android:textSize">30sp</item>-->
-<!--        <item name="hintTextAppearance">@style/HintTextAppearance</item>-->
-<!--    </style>-->
-<!--    <style name="HintTextAppearance" parent="@android:style/TextAppearance">-->
-<!--        <item name="android:textSize">20sp</item> &lt;!&ndash; floating hint text size &ndash;&gt;-->
-<!--    </style>-->
+    <!--    CUSTOMIZE MATERIAL THEME-->
+    <!--    <style name="AppTheme.TextInputEditText" parent="ThemeOverlay.MaterialComponents.TextInputEditText">-->
+    <!--        <item name="materialThemeOverlay">@style/ThemeOverlay.MaterialComponents.TextInputEditText</item>-->
+    <!--        <item name="android:textSize">14sp</item>-->
+    <!--        <item name="hintTextAppearance">@style/HintTextAppearance</item>-->
+    <!--    </style>-->
+    <!--    <style name="AppTheme.TextInputLayout.OutlinedBox" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">-->
+    <!--        <item name="materialThemeOverlay">@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox</item>-->
+    <!--        <item name="android:textSize">30sp</item>-->
+    <!--        <item name="hintTextAppearance">@style/HintTextAppearance</item>-->
+    <!--    </style>-->
+    <!--    <style name="HintTextAppearance" parent="@android:style/TextAppearance">-->
+    <!--        <item name="android:textSize">20sp</item> &lt;!&ndash; floating hint text size &ndash;&gt;-->
+    <!--    </style>-->
 
     <style name="MessagesListView">
         <item name="incomingBubblePaddingTop">@dimen/text_padding</item>
         <item name="incomingBubblePaddingBottom">@dimen/text_padding</item>
         <item name="incomingTextColor">@android:color/primary_text_dark</item>
         <item name="incomingDefaultBubbleColor">#ff333333</item>
-        <item name="incomingDefaultBubblePressedColor">@color/colorPrimaryAccent</item>
-        <item name="incomingDefaultBubbleSelectedColor">@color/colorPrimaryAccent</item>
+        <item name="incomingDefaultBubblePressedColor">@color/colorSecondaryAccent</item>
+        <item name="incomingDefaultBubbleSelectedColor">@color/colorSecondaryAccent</item>
         <item name="outcomingBubblePaddingTop">@dimen/text_padding</item>
         <item name="outcomingBubblePaddingBottom">@dimen/text_padding</item>
-        <item name="outcomingTextColor">@android:color/primary_text_dark</item>
         <item name="outcomingDefaultBubbleColor">#ff222222</item>
         <item name="dateHeaderTextColor">@color/colorPrimary</item>
         <item name="dateHeaderTextSize">@dimen/message_date_header_text_size</item>
@@ -54,7 +51,7 @@
     </style>
 
     <style name="DateHeader">
-<!--        // should be defined in "MessageListView"-->
+        <!--        // should be defined in "MessageListView"-->
         <item name="dateHeaderTextColor">@color/colorPrimaryAccent</item>
         <item name="dateHeaderTextSize">@dimen/message_date_header_text_size</item>
         <item name="dateHeaderTextStyle">bold</item>

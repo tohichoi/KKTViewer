@@ -1,26 +1,27 @@
 package com.soonsim.kktlogviewer
+
 import com.stfalcon.chatkit.commons.models.IMessage
 import com.stfalcon.chatkit.commons.models.MessageContentType
 import io.realm.RealmObject
-import io.realm.annotations.LinkingObjects
 import io.realm.annotations.PrimaryKey
 import java.util.*
 
 
 open class KKTMessage(
     @PrimaryKey
-    var messageId:String?=null,
-    var messageText:String?=null,
-    var author:KKTAuthor?=null,
-    var messageTime:Date?=null,
-    var imgUrl:String?=null) : IMessage, MessageContentType.Image, RealmObject() {
+    var messageId: String? = null,
+    var messageText: String? = null,
+    var author: KKTAuthor? = null,
+    var messageTime: Date? = null,
+    var imgUrl: String? = null
+) : IMessage, MessageContentType.Image, RealmObject() {
 
-    constructor(message:KKTMessage) : this() {
-        messageId=message.messageId
-        messageText=message.messageText
-        author=message.author
-        messageTime=message.messageTime
-        imgUrl=message.imgUrl
+    constructor(message: KKTMessage) : this() {
+        messageId = message.messageId
+        messageText = message.messageText
+        author = message.author
+        messageTime = message.messageTime
+        imgUrl = message.imgUrl
     }
 
     override fun getId(): String? {
@@ -39,35 +40,36 @@ open class KKTMessage(
         return messageTime
     }
 
-    override fun toString() : String {
+    override fun toString(): String {
         return "$messageTime, $author : $messageText\n"
     }
 
-    override fun getImageUrl() : String? {
+    override fun getImageUrl(): String? {
         return imgUrl
     }
 
-    fun isNull() : Boolean {
-        return messageId==null || messageTime==null
+    fun isNull(): Boolean {
+        return messageId == null || messageTime == null
     }
 
     companion object {
-        var messageIndex=-1
+        var messageIndex = -1
 
-        fun random() : KKTMessage {
-            val pairList=listOf<Pair<String, String>>(
+        fun random(): KKTMessage {
+            val pairList = listOf<Pair<String, String>>(
                 Pair<String, String>("John", "John Doe"),
                 Pair<String, String>("Jane", "Jane Doe"),
                 Pair<String, String>("God", "Zeus")
             )
 
-            val author=pairList.random()
-            messageIndex+=1
+            val author = pairList.random()
+            messageIndex += 1
 
             return KKTMessage(
                 messageIndex.toString(),
                 "chat message: $messageIndex",
-                KKTAuthor(author.first, author.second, null), Date(System.currentTimeMillis()))
+                KKTAuthor(author.first, author.second, null), Date(System.currentTimeMillis())
+            )
         }
     }
 }

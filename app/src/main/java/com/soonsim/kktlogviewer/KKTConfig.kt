@@ -1,7 +1,6 @@
 package com.soonsim.kktlogviewer
 
 import android.content.Context
-import android.preference.PreferenceManager
 
 class KKTConfig(context: Context) {
     protected val prefs = context.getSharedPreferences("preference", Context.MODE_PRIVATE)
@@ -10,13 +9,18 @@ class KKTConfig(context: Context) {
         fun newInstance(context: Context) = KKTConfig(context)
     }
 
-    var lastSearchText: String
-        get() = prefs.getString("queryLastText", "")!!
-        set(queryLastText) = prefs.edit().putString(queryLastText, queryLastText).apply()
+    var lastQueryText: String
+        get() = prefs.getString("lastQueryText", "")!!
+        set(lastQueryText) = prefs.edit().putString("lastQueryText", lastQueryText).apply()
 
     var lastViewedDate: Long
         get() = prefs.getLong("lastViewedDate", 0)
         set(lastViewedDate) = prefs.edit().putLong("lastViewedDate", lastViewedDate).apply()
+
+    var lastViewedPosition: Long
+        get() = prefs.getLong("lastViewedPosition", 0)
+        set(lastViewedPosition) = prefs.edit().putLong("lastViewedPosition", lastViewedPosition)
+            .apply()
 
     var authorId: String
         get() = prefs.getString("authorId", "")!!

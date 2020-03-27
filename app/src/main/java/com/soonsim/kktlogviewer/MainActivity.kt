@@ -6,16 +6,15 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.util.Log
 import android.util.TypedValue
-import android.view.*
+import android.view.Gravity
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
-import android.widget.ProgressBar
-import android.widget.RelativeLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doOnTextChanged
@@ -25,7 +24,6 @@ import com.google.android.material.datepicker.CalendarConstraints
 import com.google.android.material.datepicker.MaterialDatePicker
 import com.soonsim.kktlogviewer.DateConversion.Companion.getISOString
 import com.stfalcon.chatkit.commons.models.IMessage
-import com.stfalcon.chatkit.messages.MessageInput
 import com.stfalcon.chatkit.messages.MessagesListAdapter
 import com.stfalcon.chatkit.messages.MessagesListAdapter.HoldersConfig
 import com.stfalcon.chatkit.utils.DateFormatter
@@ -41,18 +39,21 @@ import java.util.*
 
 
 class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
-    MessagesListAdapter.OnLoadMoreListener, MessageInput.InputListener,
-    MessageInput.TypingListener, MessageInput.AttachmentsListener {
-    private val imageLoader=KKTImageLoader(this)
-    lateinit var config:KKTConfig
+    MessagesListAdapter.OnLoadMoreListener {
+    private val imageLoader = KKTImageLoader(this)
+    lateinit var config: KKTConfig
     private lateinit var mDatePickerDialog: DatePickerDialog
-    private var mMessageData=ArrayList<KKTMessage>()
-    lateinit var adapter:MessagesListAdapter<KKTMessage>
+    private var mMessageData = ArrayList<KKTMessage>()
+    lateinit var adapter: MessagesListAdapter<KKTMessage>
     private var selectionCount = 0
     private lateinit var realmconfig: RealmConfiguration
-    private var mMenu:Menu?=null
-    private var searchVisible:Boolean=false
-    val onProgressListener=MyOnProgressListener()
+    private var mMenu: Menu? = null
+    private var searchVisible: Boolean = false
+    private var lastViewedPosition = 0L
+    private var lastQueryText = ""
+    private var lastViewedDate = 0L
+    private var useDatabase = false
+    val onProgressListener = MyOnProgressListener()
 
     class KKTDateFormatter : DateFormatter.Formatter {
         override fun format(date: Date?): String {
@@ -66,7 +67,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             runOnUiThread {
                 progressBar.progress = position.toInt()
                 progressBar.max = totalCount.toInt()
-                progressText.text = "$position/$totalCount"
+//                progressText.text = "$position/$totalCount"
             }
         }
     }
@@ -76,19 +77,42 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
 
-        initData()
+        config = KKTConfig(this)
+
+        // authorId
+        if (config.authorId.isEmpty())
+            config.authorId = "최현일"
+
+        if (savedInstanceState != null) {
+            lastQueryText = savedInstanceState.getString("lastQueryText")!!
+            lastViewedDate = savedInstanceState.getLong("lastViewedDate")
+            lastViewedPosition = savedInstanceState.getLong("lastViewedPosition")
+            useDatabase = savedInstanceState.getBoolean("useDatabase")
+        } else {
+            lastViewedPosition = config.lastViewedPosition
+            lastQueryText = config.lastQueryText
+            lastViewedDate = config.lastViewedDate
+            useDatabase = config.useDatabase
+        }
+
+//        supportActionBar.setDefaultDisplayHomeAsUpEnabled(false)
+//        appBar.icon
+//        actionBar?.setIcon(R.drawable.logo_small)
+//        toolbar.title=""
+//
+//        initData()
 
         val holdersConfig = HoldersConfig()
         holdersConfig.setDateHeaderLayout(R.layout.item_custom_date_header)
 
-        adapter=MessagesListAdapter<KKTMessage>(config.authorId, holdersConfig, imageLoader)
+        adapter = MessagesListAdapter<KKTMessage>(config.authorId, holdersConfig, imageLoader)
         adapter.setDateHeadersFormatter(KKTDateFormatter())
 
-        progressBarHolder.visibility=View.GONE
-        query.visibility=View.GONE
+        progressBarHolder.visibility = View.GONE
+        query.visibility = View.GONE
 
         messagesListView.setAdapter(adapter)
-        messagesListView.addOnScrollListener(object: RecyclerView.OnScrollListener() {
+        messagesListView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 super.onScrollStateChanged(recyclerView, newState)
                 when (newState) {
@@ -96,8 +120,13 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 //                        currentDate
                         fab_down.show()
                         fab_up.show()
+                        config.lastViewedPosition = lastViewedPosition
                     }
                     else -> {
+                        val pos =
+                            (messagesListView.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition()
+                        if (pos != RecyclerView.NO_POSITION)
+                            lastViewedPosition = pos.toLong()
                         fab_down.hide()
                         fab_up.hide()
                     }
@@ -105,10 +134,9 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             }
         })
 
-
-        fab_up.setOnLongClickListener(object: View.OnLongClickListener {
+        fab_up.setOnLongClickListener(object : View.OnLongClickListener {
             override fun onLongClick(v: View?): Boolean {
-                val date=getDateOfItem(adapter.items.size-1)
+                val date = getDateOfItem(adapter.items.size - 1)
                 if (date != null) {
                     viewMessageFromDate(date, true)
                     return true
@@ -117,9 +145,9 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             }
         })
 
-        fab_down.setOnLongClickListener(object: View.OnLongClickListener {
+        fab_down.setOnLongClickListener(object : View.OnLongClickListener {
             override fun onLongClick(v: View?): Boolean {
-                val date=getDateOfItem(0)
+                val date = getDateOfItem(0)
                 if (date != null) {
                     viewMessageFromDate(date, false)
                     return true
@@ -129,28 +157,34 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         })
 
         fab_up.setOnClickListener { view ->
-            val pos=(messagesListView.layoutManager as LinearLayoutManager).findLastCompletelyVisibleItemPosition()
+            val pos =
+                (messagesListView.layoutManager as LinearLayoutManager).findLastCompletelyVisibleItemPosition()
             if (pos != RecyclerView.NO_POSITION) {
-                val date=getDateOfItem(pos)
+                val date = getDateOfItem(pos)
                 if (date != null)
                     viewMessageFromDate(date, true)
             }
         }
         fab_down.setOnClickListener { view ->
-            val pos=(messagesListView.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition()
+            val pos =
+                (messagesListView.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition()
             if (pos != RecyclerView.NO_POSITION) {
-                val date=getDateOfItem(pos)
+                val date = getDateOfItem(pos)
                 if (date != null)
                     viewMessageFromDate(date, false)
             }
         }
 
         query.editText?.doOnTextChanged { text, start, count, after ->
-            refreshList(text.toString())
+            lastQueryText = text.toString()
+            refreshList(lastQueryText)
+//            refreshList(query.editText?.text.toString())
         }
 
         query.editText?.setOnEditorActionListener { v, actionId, event ->
-            if (actionId==EditorInfo.IME_ACTION_DONE) {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                lastQueryText = v.text.toString()
+                config.lastQueryText = lastQueryText
                 searchVisible = false
                 toggleFilterView(false)
                 true
@@ -166,11 +200,17 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             .migration(KKTRealmMigration())
             .build()
         if (config.useDatabase) {
-            refreshList("")
+            query.editText?.setText(lastQueryText)
+//            refreshList(config.lastSearchText)
+        }
+
+        if (lastViewedPosition >= 0) {
+            val llm = (messagesListView.layoutManager as LinearLayoutManager)
+            llm.scrollToPositionWithOffset(lastViewedPosition.toInt(), appBar.height)
         }
     }
 
-    fun checkDbStatus() : Realm? {
+    fun checkDbStatus(): Realm? {
         if (!config.useDatabase)
             return null
 
@@ -183,8 +223,8 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
         val realm = checkDbStatus() ?: return
 
-        progressBarHolder.visibility=View.VISIBLE
-        progressBar.isIndeterminate=true
+        progressBarHolder.visibility = View.VISIBLE
+        progressBar.isIndeterminate = true
 
         val results: RealmResults<KKTMessage> = when (StringUtils.isEmpty(query)) {
             true -> {
@@ -197,7 +237,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
                     .findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING))
             }
         }
-        val reslist=results.subList(0, results.size)
+        val reslist = results.subList(0, results.size)
         mMessageData.clear()
         mMessageData.addAll(reslist)
         //        for (item in l) {
@@ -209,7 +249,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         adapter.notifyDataSetChanged()
         adapter.currentQuery = query
 
-        progressBarHolder.visibility=View.GONE
+        progressBarHolder.visibility = View.GONE
     }
 
 
@@ -226,8 +266,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 //
         if (!isVisible) {
             query.visibility = View.GONE
-        }
-        else {
+        } else {
             query.visibility = View.VISIBLE
             query.requestFocus()
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
@@ -253,21 +292,20 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     }
 
 
-    private fun getDateOfItem(pos:Int) : Date? {
-        var date:Date?=null
+    private fun getDateOfItem(pos: Int): Date? {
+        var date: Date? = null
 
-        if (pos < 0 || pos > adapter.items.size-1)
+        if (pos < 0 || pos > adapter.items.size - 1)
             return null
 
-        with (adapter.items[pos]) {
+        with(adapter.items[pos]) {
             if (item is Date) {
-                if (pos == adapter.items.size-1)
-                    date=((item) as Date)
+                if (pos == adapter.items.size - 1)
+                    date = ((item) as Date)
                 else
                     return getDateOfItem(pos + 1)
-            }
-            else if (item is IMessage)
-                date=((item) as KKTMessage).createdAt!!
+            } else if (item is IMessage)
+                date = ((item) as KKTMessage).createdAt!!
         }
 
         return date!!
@@ -275,35 +313,25 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
     private fun initData() {
 
-        config=KKTConfig(this)
+        config = KKTConfig(this)
 
         // authorId
         if (config.authorId.isEmpty())
-            config.authorId="최현일"
+            config.authorId = "최현일"
 
-        val viewDate=if (config.lastViewedDate > 0L)
+        val viewDate = if (config.lastViewedDate > 0L)
             DateConversion.millsToLocalDateTime(config.lastViewedDate)
         else
             LocalDateTime.now()
     }
 
-    override fun onStartTyping() {
-        Log.v("Typing listener", "...")
-    }
 
-    override fun onStopTyping() {
-        Log.v("Typing listener", "")
-    }
     override fun onBackPressed() {
-        if (selectionCount == 0) {
-            super.onBackPressed()
-        } else {
-            adapter.unselectAllItems()
-        }
+        super.onBackPressed()
     }
 
     override fun onLoadMore(page: Int, totalItemsCount: Int) {
-        Log.i("TAG", "onLoadMore: $page $totalItemsCount")
+        Log.i("mike", "onLoadMore: $page $totalItemsCount")
         /*
         if (totalItemsCount < com.stfalcon.chatkit.sample.features.demo.DemoMessagesActivity.TOTAL_MESSAGES_COUNT) {
             loadMessages()
@@ -333,40 +361,40 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     }
 
 
-    private fun getMessagePositionByDate(date:Date) : Int {
-        val idx=mMessageData.asReversed().binarySearch {
-            val dt0=it.createdAt!!
+    private fun getMessagePositionByDate(date: Date): Int {
+        val idx = mMessageData.asReversed().binarySearch {
+            val dt0 = it.createdAt!!
             DateUtils.truncatedCompareTo(dt0, date, Calendar.DAY_OF_MONTH)
         }
 
         return idx
     }
 
-    private fun viewMessageFromDate(date:Date, toBeginning:Boolean) {
-        val md=mMessageData.asReversed()
-        val idx=getMessagePositionByDate(date)
+    private fun viewMessageFromDate(date: Date, toBeginning: Boolean) {
+        val md = mMessageData.asReversed()
+        val idx = getMessagePositionByDate(date)
         if (idx < 0)
             Toast.makeText(this, "Cannot find message", Toast.LENGTH_SHORT).show()
         else {
 //            Log.d("mike", "Found position: ${md[idx]}")
-            val startIdx=getStartIndexOfDay(idx, toBeginning)
-            val datePos=adapter.getDateHeaderPosition(md[startIdx].createdAt)
+            val startIdx = getStartIndexOfDay(idx, toBeginning)
+            val datePos = adapter.getDateHeaderPosition(md[startIdx].createdAt)
 
-            val posDate=min(adapter.itemCount-1, max(0, adapter.itemCount - datePos -1))
-            val absDatePos=min(adapter.itemCount-1, max(0, adapter.itemCount - posDate - 1))
-            val llm=(messagesListView.layoutManager as LinearLayoutManager)
+            val posDate = min(adapter.itemCount - 1, max(0, adapter.itemCount - datePos - 1))
+            val absDatePos = min(adapter.itemCount - 1, max(0, adapter.itemCount - posDate - 1))
+            val llm = (messagesListView.layoutManager as LinearLayoutManager)
 
-            val vdate=messagesListView.findViewHolderForAdapterPosition(datePos)
+            val vdate = messagesListView.findViewHolderForAdapterPosition(datePos)
 //            val dateheadersize=if (adapter.dateHeaderHeight==0) spToPx(resources.getDimension(R.dimen.message_date_header_text_size), this) else adapter.dateHeaderHeight
-            val dateheadersize=adapter.dateHeaderHeight
-            val offset=messagesListView.bottom - dateheadersize
+            val dateheadersize = adapter.dateHeaderHeight
+            val offset = messagesListView.bottom - dateheadersize
             llm.scrollToPositionWithOffset(absDatePos, offset)
         }
     }
 
-    private fun viewMessageFromDate(year: Int, month: Int, dayOfMonth: Int, toBeginning:Boolean) {
-        val lt=LocalDateTime.of(year, month, dayOfMonth, 0, 0, 0)
-        val date=Date.from(lt.atZone(ZoneId.systemDefault()).toInstant())
+    private fun viewMessageFromDate(year: Int, month: Int, dayOfMonth: Int, toBeginning: Boolean) {
+        val lt = LocalDateTime.of(year, month, dayOfMonth, 0, 0, 0)
+        val date = Date.from(lt.atZone(ZoneId.systemDefault()).toInstant())
         viewMessageFromDate(date, toBeginning)
     }
 
@@ -378,23 +406,23 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         ).toInt()
     }
 
-    private fun getStartIndexOfDay(curIdx: Int, toBeginning:Boolean): Int {
+    private fun getStartIndexOfDay(curIdx: Int, toBeginning: Boolean): Int {
         // 날짜가 바뀌지 않을 때 까지 반복한다
-        val ml=mMessageData.asReversed()
-        val dt1=ml[curIdx].createdAt!!
-        var startIdx=0
+        val ml = mMessageData.asReversed()
+        val dt1 = ml[curIdx].createdAt!!
+        var startIdx = 0
 
         // find next day
         if (!toBeginning) {
-            startIdx=mMessageData.size-1
-            for (j in curIdx+1 until mMessageData.size){
-                val dt0=ml[j].createdAt!!
+            startIdx = mMessageData.size - 1
+            for (j in curIdx + 1 until mMessageData.size) {
+                val dt0 = ml[j].createdAt!!
                 if (!DateUtils.isSameDay(dt0, dt1)) {
-                    startIdx=j
+                    startIdx = j
                     break
                 }
             }
-        }  else { // find prev day
+        } else { // find prev day
             for (j in curIdx - 1 downTo 0 step 1) {
                 val dt0 = ml[j].createdAt!!
                 if (!DateUtils.isSameDay(dt0, dt1)) {
@@ -408,29 +436,42 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     }
 
 
-
-    fun toggleMenuItemEnabled(rid:Int, isEnabled:Boolean) {
+    fun toggleMenuItemEnabled(rid: Int, isEnabled: Boolean) {
         if (mMenu == null)
             return
 
-        val item=mMenu?.findItem(rid)
-        item?.isEnabled=isEnabled
-        item?.icon?.alpha=if (isEnabled) 0xFF else 0x7F
+        val item = mMenu?.findItem(rid)
+        item?.isEnabled = isEnabled
+        item?.icon?.alpha = if (isEnabled) 0xFF else 0x7F
     }
 
-    fun toggleMenuItemVisible(rid:Int, isVisible:Boolean) {
+    fun toggleMenuItemVisible(rid: Int, isVisible: Boolean) {
         if (mMenu == null)
             return
 
-        val item=mMenu?.findItem(rid)
+        val item = mMenu?.findItem(rid)
         item?.isVisible = isVisible
 //        item?.icon?.alpha=if (isVisible) 0xFF else 0x7F
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+
+        outState.putString("lastQueryText", lastQueryText)
+        outState.putLong("lastViewedDate", lastViewedDate)
+        outState.putLong("lastViewedPosition", lastViewedPosition)
+        outState.putBoolean("useDatabase", useDatabase)
+
+        config.lastQueryText = lastQueryText
+        config.lastViewedDate = lastViewedDate
+        config.lastViewedPosition = lastViewedPosition
+        config.useDatabase = useDatabase
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.main, menu)
-        mMenu=menu
+        mMenu = menu
 
         // default state
         toggleMenuItemEnabled(R.id.saveLog, !config.useDatabase && mMessageData.isNotEmpty())
@@ -471,21 +512,13 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
     private fun openDb(): Boolean {
         val realm = Realm.getInstance(realmconfig)
-        val result=realm.where(KKTMessage::class.java).findAll().sort("messageId", Sort.ASCENDING)
+        val result = realm.where(KKTMessage::class.java).findAll().sort("messageId", Sort.ASCENDING)
         mMessageData.clear()
         mMessageData.addAll(result.subList(0, result.size))
         adapter.notifyDataSetChanged()
         realm.close()
 
         return true
-    }
-
-    override fun onSubmit(input: CharSequence?): Boolean {
-        return false
-    }
-
-    override fun onAddAttachments() {
-
     }
 
     private fun getClearedUtc(): Calendar {
@@ -496,13 +529,13 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
     private fun getDateFromUser() {
 
-        val datelist=ArrayList<Long>()
-        val selecteddate:Long
+        val datelist = ArrayList<Long>()
+        val selecteddate: Long
 
         for (item in adapter.dateSet) {
-            var cal=getClearedUtc()
+            var cal = getClearedUtc()
 //            cal.time=DateUtils.truncate(item, Calendar.DAY_OF_MONTH)
-            cal.time=item
+            cal.time = item
             cal.set(Calendar.HOUR, 0)
             cal.set(Calendar.MINUTE, 0)
             cal.set(Calendar.SECOND, 0)
@@ -510,7 +543,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             datelist.add(cal.timeInMillis)
         }
 
-        selecteddate=if (config.lastViewedDate == 0L)
+        selecteddate = if (config.lastViewedDate == 0L)
             datelist.min()!!
         else
             config.lastViewedDate
@@ -520,8 +553,8 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         val constraintsBuilder: CalendarConstraints.Builder =
             CalendarConstraints.Builder().setValidator(DateListValidator(datelist))
 
-        val startdate=datelist.min()!!
-        val enddate=datelist.max()!!
+        val startdate = datelist.min()!!
+        val enddate = datelist.max()!!
         constraintsBuilder.setStart(startdate)
         constraintsBuilder.setEnd(enddate)
         constraintsBuilder.setOpenAt(selecteddate)
@@ -530,9 +563,9 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         val picker = builder.build()
         picker.addOnPositiveButtonClickListener {
             Toast.makeText(this, picker.headerText, Toast.LENGTH_LONG).show()
-            val selection=picker.selection as Long
-            config.lastViewedDate=selection
-            val ldt=DateConversion.millsToLocalDateTime(selection)
+            val selection = picker.selection as Long
+            config.lastViewedDate = selection
+            val ldt = DateConversion.millsToLocalDateTime(selection)
             viewMessageFromDate(ldt!!.year, ldt.monthValue, ldt.dayOfMonth, true)
         }
         picker.show(supportFragmentManager, picker.toString())
@@ -542,17 +575,17 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     private fun saveLog() {
 
 //        var offset=appBar.height + progressBarHolder.height + if (query.visibility==View.VISIBLE) query.height else 0
-        var offset=appBar.height
-        val toast=Toast.makeText(this, "Importing file ... ", Toast.LENGTH_SHORT)
+        var offset = appBar.height
+        val toast = Toast.makeText(this, "Importing file ... ", Toast.LENGTH_SHORT)
         toast.setGravity(Gravity.TOP, 0, offset)
         toast.show()
 
         val runnable = Runnable {
             val realm = checkDbStatus() ?: return@Runnable
 
-            runOnUiThread{
-                progressBarHolder.visibility=View.VISIBLE
-                progressBar.isIndeterminate=true
+            runOnUiThread {
+                progressBarHolder.visibility = View.VISIBLE
+                progressBar.isIndeterminate = true
             }
 
             if (config.useDatabase) {
@@ -584,7 +617,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             config.useDatabase = true
 
             runOnUiThread {
-                progressBarHolder.visibility=View.GONE
+                progressBarHolder.visibility = View.GONE
 
                 toggleMenuItemVisible(R.id.saveLog, false)
                 toast.setText("Successfully saved")
@@ -593,27 +626,28 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             realm.close()
         }
 
-        val thread=Thread(runnable)
+        val thread = Thread(runnable)
         thread.start()
     }
 
 
-    private fun openLog(uri:Uri) {
-        val offset=appBar.height + progressBarHolder.height + if (progressBar.visibility==View.VISIBLE) progressBar.height else 0
-        val toast=Toast.makeText(this, "Importing file ... ", Toast.LENGTH_SHORT)
+    private fun openLog(uri: Uri) {
+        val offset =
+            appBar.height + progressBarHolder.height + if (progressBar.visibility == View.VISIBLE) progressBar.height else 0
+        val toast = Toast.makeText(this, "Importing file ... ", Toast.LENGTH_SHORT)
         toast.setGravity(Gravity.TOP, 0, offset)
         toast.show()
 
         val runnable = Runnable {
-            val reader=KKTChatTextReader(this, config.authorId)
+            val reader = KKTChatTextReader(this, config.authorId)
             reader.setOnProgressChanged(onProgressListener)
 
-            runOnUiThread{
-                progressBarHolder.visibility=View.VISIBLE
-                progressBar.isIndeterminate=false
+            runOnUiThread {
+                progressBarHolder.visibility = View.VISIBLE
+                progressBar.isIndeterminate = false
             }
 
-            mMessageData=reader.readFile(uri)
+            mMessageData = reader.readFile(uri)
 
             runOnUiThread {
                 config.lastViewedDate = 0L
@@ -626,50 +660,51 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
                 }
                 toggleMenuItemVisible(R.id.saveLog, true)
 
-                progressBarHolder.visibility=View.GONE
+                progressBarHolder.visibility = View.GONE
 
                 toast.setText("Imported ${mMessageData.size} messages")
                 toast.show()
             }
         }
-        val thread=Thread(runnable)
+        val thread = Thread(runnable)
         thread.start()
     }
 
 
     private fun initSampleData() {
 //        var msgList:List<KKTMessage> = KKTChatLogReader(this).readTextLog(null, config.authorId)
-        var msgList:List<KKTMessage> = KKTChatTextReader(this, config.authorId).readFile(null)
-
-        KKTChatTextReader
-        //TODO: remove
-        for (msg in msgList) {
-            msg.author?.avatarUri=
-                when (msg.author?.authorAlias) {
-                    "John Doe" -> {
-                        "android.resource://" + packageName + "/" + R.drawable.neofrodo02
-                    }
-                    "Jane Doe" -> {
-                        "android.resource://" + packageName + "/" + R.drawable.neofrodo03
-                    }
-                    "Zeus" -> {
-                        "android.resource://" + packageName + "/" + R.drawable.neofrodo04
-                    }
-                    else -> {
-                        "android.resource://" + packageName + "/" + R.drawable.neofrodo05
-                    }
-                }
-        }
+//        var msgList:List<KKTMessage> = KKTChatTextReader(this, config.authorId).readFile(null)
+//
+//        //TODO: remove
+//        for (msg in msgList) {
+//            msg.author?.avatarUri=
+//                when (msg.author?.authorAlias) {
+//                    "John Doe" -> {
+//                        "android.resource://" + packageName + "/" + R.drawable.neofrodo02
+//                    }
+//                    "Jane Doe" -> {
+//                        "android.resource://" + packageName + "/" + R.drawable.neofrodo03
+//                    }
+//                    "Zeus" -> {
+//                        "android.resource://" + packageName + "/" + R.drawable.neofrodo04
+//                    }
+//                    else -> {
+//                        "android.resource://" + packageName + "/" + R.drawable.neofrodo05
+//                    }
+//                }
+//        }
     }
 
-    private fun getLogFilePathFromUser()
-    {
+    private fun getLogFilePathFromUser() {
         var intent: Intent = Intent()
             .setType("text/*")
             .setAction(Intent.ACTION_GET_CONTENT)
 //            .setData(Uri.parse(config.lastOpenedFile))
 
-        startActivityForResult(Intent.createChooser(intent, "Select a file"), REQUEST_CODE_IMPORT_TEXT)
+        startActivityForResult(
+            Intent.createChooser(intent, "Select a file"),
+            REQUEST_CODE_IMPORT_TEXT
+        )
     }
 
 

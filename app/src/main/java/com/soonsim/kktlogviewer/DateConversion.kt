@@ -8,29 +8,30 @@ import java.util.*
 
 class DateConversion {
     companion object {
-        fun dateToCalendar(date: Date) : Calendar {
-            val cal=Calendar.getInstance(TimeZone.getTimeZone(ZoneId.systemDefault()))
-            cal.time=date
+        fun dateToCalendar(date: Date): Calendar {
+            val cal = Calendar.getInstance(TimeZone.getTimeZone(ZoneId.systemDefault()))
+            cal.time = date
             return cal
         }
 
-        fun dateToLocalDateTime(date: Date, zoneOffset: ZoneOffset? = null) : LocalDateTime {
+        fun dateToLocalDateTime(date: Date, zoneOffset: ZoneOffset? = null): LocalDateTime {
             val instant: Instant = Instant.ofEpochMilli(date.time)
-            val ldt: LocalDateTime = LocalDateTime.ofInstant(instant,
+            val ldt: LocalDateTime = LocalDateTime.ofInstant(
+                instant,
                 zoneOffset ?: ZoneOffset.UTC
             )
             return ldt
         }
 
-        fun localDateTimeToDate(localdatetime: LocalDateTime) : Date {
+        fun localDateTimeToDate(localdatetime: LocalDateTime): Date {
             val instant: Instant = localdatetime.atZone(ZoneId.systemDefault()).toInstant()
             val date = Date.from(instant)
             return date
         }
 
-        fun localDateToString(s: String) : LocalDate {
-            val formatter= DateTimeFormatter.ofPattern("yyyy-MM-dd")
-            val viewDate= LocalDate.parse(s, formatter)
+        fun localDateToString(s: String): LocalDate {
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+            val viewDate = LocalDate.parse(s, formatter)
             return viewDate
         }
 
@@ -39,17 +40,18 @@ class DateConversion {
             return instant.atZone(ZoneId.systemDefault()).toLocalDateTime()
         }
 
-        fun localDateTimeToMilli(ldt: LocalDateTime) : Long {
+        fun localDateTimeToMilli(ldt: LocalDateTime): Long {
             return LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         }
 
-        fun getISOString(date:Date) : String {
+        fun getISOString(date: Date): String {
             return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
         }
 
-        fun getDateFromString(s: String) : Date? {
+        fun getDateFromString(s: String): Date? {
             // 2018년 12월 5일 오후 4:49
-            val fmt = DateTimeFormatter.ofPattern("yyyy'년' MM'월' dd'일' a HH:mm", Locale.getDefault())
+            val fmt =
+                DateTimeFormatter.ofPattern("yyyy'년' MM'월' dd'일' a HH:mm", Locale.getDefault())
             val datetime = try {
                 Date.from(LocalDateTime.parse(s, fmt).atZone(ZoneId.systemDefault()).toInstant())
             } catch (e: DateTimeParseException) {

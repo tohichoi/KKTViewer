@@ -4,12 +4,16 @@ import com.stfalcon.chatkit.commons.models.IUser
 import io.realm.RealmObject
 
 
-open class KKTAuthor(var authorId:String="Unknown", var authorAlias:String="Unknown", var avatarUri:String?=null) : IUser, RealmObject() {
+open class KKTAuthor(
+    var authorId: String = "Unknown",
+    var authorAlias: String = "Unknown",
+    var avatarUri: String? = null
+) : IUser, RealmObject() {
 
-    constructor(author:KKTAuthor) : this() {
-        authorId=author.authorId
-        authorAlias=author.authorAlias
-        avatarUri=author.avatarUri
+    constructor(author: KKTAuthor) : this() {
+        authorId = author.authorId
+        authorAlias = author.authorAlias
+        avatarUri = author.avatarUri
     }
 
     override fun getId(): String {
@@ -24,7 +28,7 @@ open class KKTAuthor(var authorId:String="Unknown", var authorAlias:String="Unkn
         return avatarUri
     }
 
-    override fun toString() : String {
+    override fun toString(): String {
         return "$authorId($authorAlias)"
     }
 }

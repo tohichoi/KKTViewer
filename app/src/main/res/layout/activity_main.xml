@@ -9,42 +9,42 @@
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBar"
         android:layout_width="match_parent"
-        liftOnScrollTargetViewId="@id/messagesListView"
         android:layout_height="wrap_content">
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:layout_scrollFlags="scroll|snap|enterAlways"
             android:theme="@style/AppTheme.AppBarOverlay"
+            app:layout_scrollFlags="scroll|snap|enterAlways"
             app:popupTheme="@style/AppTheme.PopupOverlay" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/query"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:endIconMode="clear_text"
-            app:layout_scrollFlags="scroll|snap|enterAlways"
+            android:hint="Find..."
             android:visibility="visible"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
-            android:hint="Find...">
+            app:endIconMode="clear_text"
+            app:layout_scrollFlags="scroll|snap|enterAlways">
 
             <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/queryText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:imeOptions="actionDone"
-                android:maxLines="1"
-                android:inputType="text" />
+                android:inputType="text"
+                android:maxLines="1" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
+            android:id="@+id/progressBarHolder"
             android:layout_width="match_parent"
             android:layout_height="20dp"
             android:orientation="horizontal"
-            app:layout_scrollFlags="scroll|snap|enterAlways"
-            android:id="@+id/progressBarHolder">
+            app:layout_scrollFlags="scroll|snap|enterAlways">
 
             <ProgressBar
                 android:id="@+id/progressBar"
@@ -53,8 +53,8 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:indeterminate="false"
-                android:min="0"
                 android:max="100"
+                android:min="0"
                 android:progress="50" />
 
             <TextView
@@ -72,25 +72,20 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <LinearLayout
+        <com.stfalcon.chatkit.messages.MessagesList
+            android:id="@+id/messagesListView"
+            style="@style/MessagesListView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:layout_weight="1" />
 
-            <com.stfalcon.chatkit.messages.MessagesList
-                android:id="@+id/messagesListView"
-                style="@style/MessagesListView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_weight="1" />
-        </LinearLayout>
     </RelativeLayout>
 
     <RelativeLayout
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
-        android:layout_margin="@dimen/fab_margin"
-        android:layout_gravity="start|bottom" >
+        android:layout_gravity="start|bottom"
+        android:layout_margin="@dimen/fab_margin">
 
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fab_up"
@@ -115,7 +110,6 @@
             android:src="@drawable/keyboard_arrow_down"
             app:fabSize="mini" />
     </RelativeLayout>
-
 
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,23 +1,61 @@
-• 이미지 로딩
+* github 업로드
 
-• 스크롤바 추가
+* fast scroll : fail
+    <com.stfalcon.chatkit.messages.MessagesList
+        app:fastScrollEnabled="true"
+        app:fastScrollVerticalThumbDrawable="@drawable/unfold_more"
+        app:fastScrollVerticalTrackDrawable="@drawable/line"
 
-• DONE 메시지 작성시간이 같은 minute 일 때 sorting 안되는 문제 수정
+    # exception
+        recyclerview android.graphics.drawable.VectorDrawable cannot be cast to android.graphics.drawable.StateListDrawable
+
+* DONE material text input 한글 크기 버그 수정
+  - android:layout_height 가 툴바 사이즈로 설정되어 있었음
+  -         <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/query"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+
+* 이미지 로딩
+
+* 파일 사이즈 확인 버그
+  - contents resolver 에서 리턴되는 사이즈가 실제 크기보다 2배 정도 큼
+        // file sizing problem:
+        //   sized returned in bytes,
+        //   reading file as String
+        //   read size is readline.length*Character.BYTES
+        // ref: https://www.rosettacode.org/wiki/String_length#Kotlin
+
+* 필터 활성화 시 move to date disable
+
+* DROP 스크롤바 추가
+  - useless
+
+* DONE 메시지 작성시간이 같은 minute 일 때 sorting 안되는 문제 수정
   - val message=KKTMessage(msgId, newtext, author, DateUtils.addMilliseconds(time, messageTime++))
 
-• importing 시 progressbar
+* DONE importing 시 progressbar
+  - threading
 
-• DB로 저장, DB로 읽기 : plugin 설정이 정확하게 되어있지 않았음(kotlin-kapt)
+* DONE saving 시 progressbar
+  - threading
+  - realm 인스탄스는 각 쓰레드에서 생성해야함
+    val realm=Realm.getInstance(realmconfig)
+
+* DONE 쿼리 토글 버그 수정
+  - ime action 시 토글 상태 변수 수정
+
+* DB로 저장, DB로 읽기 : plugin 설정이 정확하게 되어있지 않았음(kotlin-kapt)
   - apply plugin: 'com.android.application'
     apply plugin: 'kotlin-android'
     apply plugin: 'kotlin-android-extensions'
     apply plugin: 'kotlin-kapt'
     apply plugin: 'realm-android'
 
-• DONE 날짜 이동 시 오늘 페이지가 나옴. 선택된 페이지가 처음에 표시되도록 변경
+* DONE 날짜 이동 시 오늘 페이지가 나옴. 선택된 페이지가 처음에 표시되도록 변경
   - constraintsBuilder.setOpenAt(selecteddate)
 
-• DONE 아이콘 disable 상태 변경
+* DONE 아이콘 disable 상태 변경
   - @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
 
@@ -33,7 +71,7 @@
         }
     }
 
-• DONE DATE HEADER 포맷 변경
+* DONE DATE HEADER 포맷 변경
   -     class KKTDateFormatter : DateFormatter.Formatter {
             override fun format(date: Date?): String {
                 return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
@@ -42,9 +80,9 @@
         adapter.setDateHeadersFormatter(KKTDateFormatter())
 
 
-• DONE 버블 색깔 변경 (dark)
+* DONE 버블 색깔 변경 (dark)
 
-• DONE Navigator 만들기
+* DONE Navigator 만들기
   - 날짜 단위로 스크롤
   - Floating action button
     - 위 화살표, 아래 화살표
