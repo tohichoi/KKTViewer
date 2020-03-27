@@ -151,6 +151,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
         query.editText?.setOnEditorActionListener { v, actionId, event ->
             if (actionId==EditorInfo.IME_ACTION_DONE) {
+                searchVisible = false
                 toggleFilterView(false)
                 true
             }
@@ -169,14 +170,21 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         }
     }
 
+    fun checkDbStatus() : Realm? {
+        if (!config.useDatabase)
+            return null
+
+        val realm = Realm.getInstance(realmconfig)
+
+        return realm
+    }
+
     fun refreshList(query: String) {
+
+        val realm = checkDbStatus() ?: return
 
         progressBarHolder.visibility=View.VISIBLE
         progressBar.isIndeterminate=true
-
-        val realm = Realm.getInstance(realmconfig)
-        if (!config.useDatabase || realm.isClosed || realm.isEmpty)
-            return
 
         val results: RealmResults<KKTMessage> = when (StringUtils.isEmpty(query)) {
             true -> {
@@ -410,6 +418,15 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         item?.icon?.alpha=if (isEnabled) 0xFF else 0x7F
     }
 
+    fun toggleMenuItemVisible(rid:Int, isVisible:Boolean) {
+        if (mMenu == null)
+            return
+
+        val item=mMenu?.findItem(rid)
+        item?.isVisible = isVisible
+//        item?.icon?.alpha=if (isVisible) 0xFF else 0x7F
+    }
+
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.main, menu)
@@ -523,62 +540,61 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
 
     private fun saveLog() {
-        /*
-        val config = RealmConfiguration.Builder()
-            .name("kktviewer.realm")
-//            .encryptionKey(getMyKey())
-            .schemaVersion(0)
-            .modules(Realm.getDefaultModule())
-            .build()
 
-        val schema = realm.schema
+//        var offset=appBar.height + progressBarHolder.height + if (query.visibility==View.VISIBLE) query.height else 0
+        var offset=appBar.height
+        val toast=Toast.makeText(this, "Importing file ... ", Toast.LENGTH_SHORT)
+        toast.setGravity(Gravity.TOP, 0, offset)
+        toast.show()
 
-        schema.create("KKTAuthor")
-            .addField("authorId", String::class.java)
-            .addField("authorAlias", String::class.java)
-            .addField("avatarUri", String::class.java)
+        val runnable = Runnable {
+            val realm = checkDbStatus() ?: return@Runnable
 
-        schema.create("KKTMessage")
-            .addField("messageId", String::class.java)
-            .addField("messageText", String::class.java)
-            .addField("author", KKTAuthor::class.java)
-            .addField("messageTime", String::class.java)
-            .addField("imgUrl", String::class.java)
-        */
+            runOnUiThread{
+                progressBarHolder.visibility=View.VISIBLE
+                progressBar.isIndeterminate=true
+            }
 
-        val realm = Realm.getInstance(realmconfig)
+            if (config.useDatabase) {
+                realm.executeTransaction {
+                    it.deleteAll()
+                }
+                config.useDatabase = false
+            }
 
-        if (config.useDatabase) {
             realm.executeTransaction {
-                it.deleteAll()
+                for (message in mMessageData) {
+                    // date message inserted by ChatKit
+                    if (message.isNull())
+                        continue
+                    val m = message
+                    it.copyToRealmOrUpdate(m)
+                }
             }
-            config.useDatabase=false
+
+            // test
+            //        var res: RealmResults<KKTMessage>
+            //        res=realm.where(KKTMessage::class.java).findAll()
+            //        var resarr=ArrayList<KKTMessage>()
+            //        resarr.addAll(res.subList(0, res.size))
+            //        for (item in resarr) {
+            //            Log.d("mike", "${item.author}")
+            //        }
+
+            config.useDatabase = true
+
+            runOnUiThread {
+                progressBarHolder.visibility=View.GONE
+
+                toggleMenuItemVisible(R.id.saveLog, false)
+                toast.setText("Successfully saved")
+                toast.show()
+            }
+            realm.close()
         }
 
-        realm.executeTransaction {
-            for (message in mMessageData) {
-                // date message inserted by ChatKit
-                if (message.isNull())
-                    continue
-                val m=message
-                it.copyToRealmOrUpdate(m)
-            }
-        }
-
-        // test
-//        var res: RealmResults<KKTMessage>
-//        res=realm.where(KKTMessage::class.java).findAll()
-//        var resarr=ArrayList<KKTMessage>()
-//        resarr.addAll(res.subList(0, res.size))
-//        for (item in resarr) {
-//            Log.d("mike", "${item.author}")
-//        }
-
-        config.useDatabase=true
-
-        toggleMenuItemEnabled(R.id.saveLog, false)
-
-        Toast.makeText(this, "Successfully saved", Toast.LENGTH_SHORT)
+        val thread=Thread(runnable)
+        thread.start()
     }
 
 
@@ -608,10 +624,11 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
                 for (item in listOf(R.id.saveLog, R.id.moveToDay, R.id.findMessage)) {
                     toggleMenuItemEnabled(item, mMessageData.isNotEmpty())
                 }
+                toggleMenuItemVisible(R.id.saveLog, true)
 
                 progressBarHolder.visibility=View.GONE
 
-                toast.setText("Imported ${mMessageData.size}} messages")
+                toast.setText("Imported ${mMessageData.size} messages")
                 toast.show()
             }
         }
