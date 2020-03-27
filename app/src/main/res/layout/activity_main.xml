@@ -52,10 +52,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
-                android:indeterminate="false"
-                android:max="100"
-                android:min="0"
-                android:progress="50" />
+                android:indeterminate="false" />
 
             <TextView
                 android:id="@+id/progressText"

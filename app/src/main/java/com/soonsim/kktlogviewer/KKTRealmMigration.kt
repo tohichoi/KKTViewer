@@ -51,4 +51,14 @@ class KKTRealmMigration : RealmMigration {
             oldVersion++
         }
     }
+
+    override fun hashCode(): Int {
+        return KKTRealmMigration::class.java.hashCode()
+    }
+
+    override fun equals(`object`: Any?): Boolean {
+        return if (`object` == null) {
+            false
+        } else `object` is KKTRealmMigration
+    }
 }

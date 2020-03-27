@@ -5,6 +5,17 @@ apply plugin: 'kotlin-kapt'
 apply plugin: 'realm-android'
 
 android {
+
+    Properties properties = new Properties()
+    properties.load(project.rootProject.file('local.properties').newDataInputStream())
+    signingConfigs {
+        config {
+            keyAlias 'android'
+            keyPassword properties.getProperty("keyPassword")
+            storeFile file(properties.getProperty("storeFile"))
+            storePassword properties.getProperty("storePassword")
+        }
+    }
     compileSdkVersion 29
     buildToolsVersion "29.0.3"
 
@@ -31,6 +42,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.config
         }
     }
 

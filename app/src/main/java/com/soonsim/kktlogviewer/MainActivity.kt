@@ -326,7 +326,17 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     }
 
 
+    private fun saveCurrentState() {
+        config.lastQueryText = lastQueryText
+        config.lastViewedDate = lastViewedDate
+        config.lastViewedPosition = lastViewedPosition
+        config.useDatabase = useDatabase
+    }
+
+
     override fun onBackPressed() {
+        saveCurrentState()
+
         super.onBackPressed()
     }
 
@@ -387,7 +397,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             val vdate = messagesListView.findViewHolderForAdapterPosition(datePos)
 //            val dateheadersize=if (adapter.dateHeaderHeight==0) spToPx(resources.getDimension(R.dimen.message_date_header_text_size), this) else adapter.dateHeaderHeight
             val dateheadersize = adapter.dateHeaderHeight
-            val offset = messagesListView.bottom - dateheadersize
+            val offset = messagesListView.bottom - dateheadersize - if (appBar.visibility==View.VISIBLE) appBar.height else 0
             llm.scrollToPositionWithOffset(absDatePos, offset)
         }
     }
@@ -455,17 +465,14 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-
         outState.putString("lastQueryText", lastQueryText)
         outState.putLong("lastViewedDate", lastViewedDate)
         outState.putLong("lastViewedPosition", lastViewedPosition)
         outState.putBoolean("useDatabase", useDatabase)
 
-        config.lastQueryText = lastQueryText
-        config.lastViewedDate = lastViewedDate
-        config.lastViewedPosition = lastViewedPosition
-        config.useDatabase = useDatabase
+        saveCurrentState()
+
+        super.onSaveInstanceState(outState)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -543,10 +550,10 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             datelist.add(cal.timeInMillis)
         }
 
-        selecteddate = if (config.lastViewedDate == 0L)
+        selecteddate = if (lastViewedDate == 0L)
             datelist.min()!!
         else
-            config.lastViewedDate
+            lastViewedDate
 
         val builder: MaterialDatePicker.Builder<*> =
             MaterialDatePicker.Builder.datePicker().setSelection(selecteddate)
@@ -562,9 +569,9 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         builder.setCalendarConstraints(constraintsBuilder.build())
         val picker = builder.build()
         picker.addOnPositiveButtonClickListener {
-            Toast.makeText(this, picker.headerText, Toast.LENGTH_LONG).show()
+//            Toast.makeText(this, picker.headerText, Toast.LENGTH_LONG).show()
             val selection = picker.selection as Long
-            config.lastViewedDate = selection
+            lastViewedDate = selection
             val ldt = DateConversion.millsToLocalDateTime(selection)
             viewMessageFromDate(ldt!!.year, ldt.monthValue, ldt.dayOfMonth, true)
         }
@@ -576,32 +583,37 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
 //        var offset=appBar.height + progressBarHolder.height + if (query.visibility==View.VISIBLE) query.height else 0
         var offset = appBar.height
-        val toast = Toast.makeText(this, "Importing file ... ", Toast.LENGTH_SHORT)
+        val toast = Toast.makeText(this, "Saving ... ", Toast.LENGTH_SHORT)
         toast.setGravity(Gravity.TOP, 0, offset)
         toast.show()
 
         val runnable = Runnable {
-            val realm = checkDbStatus() ?: return@Runnable
+            val realm = Realm.getInstance(realmconfig) ?: return@Runnable
 
             runOnUiThread {
                 progressBarHolder.visibility = View.VISIBLE
-                progressBar.isIndeterminate = true
+//                progressBar.isIndeterminate = true
             }
 
-            if (config.useDatabase) {
+            if (useDatabase) {
                 realm.executeTransaction {
                     it.deleteAll()
                 }
-                config.useDatabase = false
+                useDatabase = false
             }
 
+            val messagesize=mMessageData.size.toLong()
             realm.executeTransaction {
-                for (message in mMessageData) {
+                for ((index, message) in mMessageData.withIndex()) {
                     // date message inserted by ChatKit
                     if (message.isNull())
                         continue
                     val m = message
                     it.copyToRealmOrUpdate(m)
+
+                    runOnUiThread {
+                        onProgressListener.onProgressChanged((index+1).toLong(), messagesize)
+                    }
                 }
             }
 
@@ -614,7 +626,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             //            Log.d("mike", "${item.author}")
             //        }
 
-            config.useDatabase = true
+            useDatabase = true
 
             runOnUiThread {
                 progressBarHolder.visibility = View.GONE
@@ -650,7 +662,11 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             mMessageData = reader.readFile(uri)
 
             runOnUiThread {
-                config.lastViewedDate = 0L
+                lastViewedDate = 0L
+                lastViewedPosition = 0L
+                useDatabase = false
+                lastQueryText = ""
+
                 adapter.clear()
                 adapter.addToEnd(mMessageData, true)
                 adapter.notifyDataSetChanged()
