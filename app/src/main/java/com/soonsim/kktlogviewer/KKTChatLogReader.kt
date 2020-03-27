@@ -259,7 +259,6 @@ class KKTChatTextReader(private val context: Context, private val myName: String
                         messageTime = 1
                         val chatChunkTime = res.second
                         if (prevlt == LineType.MESSAGE) {
-                            val res2 = parseDateTimeExpr(line)
                             insertMessage(messageList, time!!, nick, text)
                             time = null
                             nick = ""
