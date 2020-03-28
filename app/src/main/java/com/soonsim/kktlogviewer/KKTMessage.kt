@@ -13,6 +13,7 @@ open class KKTMessage(
     var messageText: String? = null,
     var author: KKTAuthor? = null,
     var messageTime: Date? = null,
+    var selected: Boolean = false,
     var imgUrl: String? = null
 ) : IMessage, MessageContentType.Image, RealmObject() {
 
@@ -21,6 +22,7 @@ open class KKTMessage(
         messageText = message.messageText
         author = message.author
         messageTime = message.messageTime
+        selected = message.selected
         imgUrl = message.imgUrl
     }
 
@@ -48,8 +50,13 @@ open class KKTMessage(
         return imgUrl
     }
 
+
     fun isNull(): Boolean {
         return messageId == null || messageTime == null
+    }
+
+    operator fun compareTo(id: String): Int {
+        return messageId!!.compareTo(id)
     }
 
     companion object {

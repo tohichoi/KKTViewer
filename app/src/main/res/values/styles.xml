@@ -20,17 +20,18 @@
 
     <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
-    <!--    CUSTOMIZE MATERIAL THEME-->
-    <!--    <style name="AppTheme.TextInputEditText" parent="ThemeOverlay.MaterialComponents.TextInputEditText">-->
-    <!--        <item name="materialThemeOverlay">@style/ThemeOverlay.MaterialComponents.TextInputEditText</item>-->
-    <!--        <item name="android:textSize">14sp</item>-->
-    <!--        <item name="hintTextAppearance">@style/HintTextAppearance</item>-->
-    <!--    </style>-->
-    <!--    <style name="AppTheme.TextInputLayout.OutlinedBox" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">-->
-    <!--        <item name="materialThemeOverlay">@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox</item>-->
-    <!--        <item name="android:textSize">30sp</item>-->
-    <!--        <item name="hintTextAppearance">@style/HintTextAppearance</item>-->
-    <!--    </style>-->
+<!--        CUSTOMIZE MATERIAL THEME-->
+        <style name="AppTheme.TextInputEditText" parent="ThemeOverlay.MaterialComponents.TextInputEditText">
+            <item name="materialThemeOverlay">@style/ThemeOverlay.MaterialComponents.TextInputEditText</item>
+<!--            <item name="android:textSize">14sp</item>-->
+            <item name="colorControlActivated">@color/colorSecondary</item>
+<!--            <item name="hintTextAppearance">@style/HintTextAppearance</item>-->
+        </style>
+<!--        <style name="AppTheme.TextInputLayout.OutlinedBox" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">-->
+<!--            <item name="materialThemeOverlay">@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox</item>-->
+<!--            <item name="android:textSize">30sp</item>-->
+<!--            <item name="hintTextAppearance">@style/HintTextAppearance</item>-->
+<!--        </style>-->
     <!--    <style name="HintTextAppearance" parent="@android:style/TextAppearance">-->
     <!--        <item name="android:textSize">20sp</item> &lt;!&ndash; floating hint text size &ndash;&gt;-->
     <!--    </style>-->
@@ -40,11 +41,14 @@
         <item name="incomingBubblePaddingBottom">@dimen/text_padding</item>
         <item name="incomingTextColor">@android:color/primary_text_dark</item>
         <item name="incomingDefaultBubbleColor">#ff333333</item>
-        <item name="incomingDefaultBubblePressedColor">@color/colorSecondaryAccent</item>
-        <item name="incomingDefaultBubbleSelectedColor">@color/colorSecondaryAccent</item>
+        <item name="incomingDefaultBubblePressedColor">#ff333333</item>
+        <item name="incomingDefaultBubbleSelectedColor">@color/colorSecondaryDark</item>
         <item name="outcomingBubblePaddingTop">@dimen/text_padding</item>
         <item name="outcomingBubblePaddingBottom">@dimen/text_padding</item>
+        <item name="outcomingTextColor">@android:color/primary_text_dark</item>
         <item name="outcomingDefaultBubbleColor">#ff222222</item>
+        <item name="outcomingDefaultBubblePressedColor">#ff222222</item>
+        <item name="outcomingDefaultBubbleSelectedColor">@color/colorSecondaryDark</item>
         <item name="dateHeaderTextColor">@color/colorPrimary</item>
         <item name="dateHeaderTextSize">@dimen/message_date_header_text_size</item>
         <item name="dateHeaderTextStyle">bold</item>

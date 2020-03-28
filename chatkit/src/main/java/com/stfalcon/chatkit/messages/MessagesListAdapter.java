@@ -33,6 +33,7 @@ import android.widget.TextView;
 
 import androidx.annotation.LayoutRes;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.SortedList;
 
 import com.stfalcon.chatkit.R;
 import com.stfalcon.chatkit.commons.ImageLoader;
@@ -49,10 +50,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 class DateComparator implements Comparator<Date> {
     @Override
@@ -73,6 +77,7 @@ public class MessagesListAdapter<MESSAGE extends IMessage>
 
     public List<Wrapper> items;
     public String currentQuery="";
+    public TreeSet<Integer> selectedItemPosition= new TreeSet<>();
     private MessageHolders holders;
     private String senderId;
     private TreeMap<Date, Integer> dates = new TreeMap<Date, Integer>(new DateComparator());
@@ -403,6 +408,8 @@ public class MessagesListAdapter<MESSAGE extends IMessage>
     public void clear(boolean notifyDataSetChanged) {
         if (items != null) {
             items.clear();
+            selectedItemPosition.clear();
+            dates.clear();
             if (notifyDataSetChanged) {
                 notifyDataSetChanged();
             }
@@ -686,11 +693,18 @@ public class MessagesListAdapter<MESSAGE extends IMessage>
                 if (selectionListener != null && isSelectionModeEnabled) {
                     wrapper.isSelected = !wrapper.isSelected;
 
-                    if (wrapper.isSelected) incrementSelectedItemsCount();
-                    else decrementSelectedItemsCount();
-
                     MESSAGE message = (wrapper.item);
-                    notifyItemChanged(getMessagePositionById(message.getId()));
+                    int pos=getMessagePositionById(message.getId());
+                    if (wrapper.isSelected) {
+                        incrementSelectedItemsCount();
+                        selectedItemPosition.add(pos);
+                    }
+                    else {
+                        decrementSelectedItemsCount();
+                        selectedItemPosition.remove(pos);
+                    }
+
+                    notifyItemChanged(pos);
                 } else {
                     notifyMessageClicked(wrapper.item);
                     notifyMessageViewClicked(view, wrapper.item);

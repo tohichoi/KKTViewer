@@ -44,10 +44,11 @@ class KKTRealmMigration : RealmMigration {
         // ): RealmObject()
 
         if (oldVersion == 1L) {
-            schema.get("KKTAuthor")!!
-                .addField("id", Long::class.javaPrimitiveType, FieldAttribute.PRIMARY_KEY)
-                .addRealmObjectField("favoriteDog", schema.get("Dog"))
-                .addRealmListField("dogs", schema.get("Dog"))
+            schema.get("KKTMessage")!!
+                .addField("selected", Boolean::class.java)
+//                .addField("id", Long::class.javaPrimitiveType, FieldAttribute.PRIMARY_KEY)
+//                .addRealmObjectField("favoriteDog", schema.get("Dog"))
+//                .addRealmListField("dogs", schema.get("Dog"))
             oldVersion++
         }
     }

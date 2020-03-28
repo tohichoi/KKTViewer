@@ -24,6 +24,8 @@
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="1dp"
             android:hint="Find..."
             android:visibility="visible"
             app:endIconMode="clear_text"
@@ -42,7 +44,7 @@
         <LinearLayout
             android:id="@+id/progressBarHolder"
             android:layout_width="match_parent"
-            android:layout_height="20dp"
+            android:layout_height="16dp"
             android:orientation="horizontal"
             app:layout_scrollFlags="scroll|snap|enterAlways">
 
@@ -93,6 +95,7 @@
             android:layout_gravity="start|bottom"
             android:layout_marginBottom="@dimen/fab_margin"
             android:alpha="128"
+            android:background="@color/colorPrimaryAccent"
             android:src="@drawable/keyboard_arrow_up"
             app:fabSize="mini" />
 
@@ -104,6 +107,7 @@
             android:layout_alignParentBottom="true"
             android:layout_gravity="start|bottom"
             android:alpha="128"
+            android:background="@color/colorPrimaryAccent"
             android:src="@drawable/keyboard_arrow_down"
             app:fabSize="mini" />
     </RelativeLayout>

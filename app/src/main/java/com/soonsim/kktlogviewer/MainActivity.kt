@@ -2,6 +2,8 @@ package com.soonsim.kktlogviewer
 
 import android.app.Activity
 import android.app.DatePickerDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -38,8 +40,10 @@ import java.time.ZoneId
 import java.util.*
 
 
-class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
-    MessagesListAdapter.OnLoadMoreListener {
+class MainActivity : AppCompatActivity(),
+    MessagesListAdapter.SelectionListener,
+    MessagesListAdapter.OnLoadMoreListener,
+    MessagesListAdapter.OnMessageLongClickListener<KKTMessage>  {
     private val imageLoader = KKTImageLoader(this)
     lateinit var config: KKTConfig
     private lateinit var mDatePickerDialog: DatePickerDialog
@@ -107,6 +111,8 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
         adapter = MessagesListAdapter<KKTMessage>(config.authorId, holdersConfig, imageLoader)
         adapter.setDateHeadersFormatter(KKTDateFormatter())
+//        adapter.setOnMessageLongClickListener(this)
+        adapter.enableSelectionMode(this)
 
         progressBarHolder.visibility = View.GONE
         query.visibility = View.GONE
@@ -161,7 +167,10 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
                 (messagesListView.layoutManager as LinearLayoutManager).findLastCompletelyVisibleItemPosition()
             if (pos != RecyclerView.NO_POSITION) {
                 val date = getDateOfItem(pos)
-                if (date != null)
+                val selpos=adapter.selectedItemPosition.higher(pos)
+                if (selpos != null) {
+                    viewMessage(selpos)
+                } else if (date != null)
                     viewMessageFromDate(date, true)
             }
         }
@@ -170,14 +179,32 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
                 (messagesListView.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition()
             if (pos != RecyclerView.NO_POSITION) {
                 val date = getDateOfItem(pos)
-                if (date != null)
+                val selpos=adapter.selectedItemPosition.lower(pos)
+                if (selpos != null) {
+                    viewMessage(selpos)
+                } else if (date != null)
                     viewMessageFromDate(date, false)
             }
         }
 
+        query.setEndIconOnLongClickListener {
+            query.editText?.setText("")
+            searchVisible = false
+            toggleFilterView(false)
+            showKeyboard(this, false)
+            true
+        }
+
+        query.setEndIconOnClickListener {
+            query.editText?.setText("")
+//            searchVisible = false
+//            toggleFilterView(false)
+            showKeyboard(this, true)
+        }
+
         query.editText?.doOnTextChanged { text, start, count, after ->
             lastQueryText = text.toString()
-            refreshList(lastQueryText)
+            refreshListAndSelect(lastQueryText)
 //            refreshList(query.editText?.text.toString())
         }
 
@@ -185,8 +212,8 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 lastQueryText = v.text.toString()
                 config.lastQueryText = lastQueryText
-                searchVisible = false
-                toggleFilterView(false)
+//                searchVisible = false
+//                toggleFilterView(false)
                 true
             }
             false
@@ -196,7 +223,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         realmconfig = RealmConfiguration.Builder()
             .name("kktviewer.realm")
 //            .encryptionKey(getMyKey())
-            .schemaVersion(1)
+            .schemaVersion(2)
             .migration(KKTRealmMigration())
             .build()
         if (config.useDatabase) {
@@ -210,8 +237,29 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         }
     }
 
+    private fun refreshListAndSelect(lastQueryText: String) {
+        val sellist=HashSet<String>()
+        sellist.addAll(adapter.selectedMessages.map {
+            it.messageId!!
+        })
+
+        refreshList(lastQueryText)
+
+        if (sellist.isEmpty()) return
+
+        for (i in 0 until adapter.items.size) {
+            if (adapter.items[i].item is KKTMessage) {
+                if (sellist.contains((adapter.items[i].item as KKTMessage).messageId)) {
+                    adapter.items[i].isSelected = true
+                    adapter.selectedItemPosition.add(i)
+                    adapter.notifyItemChanged(i)
+                }
+            }
+        }
+    }
+
     fun checkDbStatus(): Realm? {
-        if (!config.useDatabase)
+        if (!useDatabase)
             return null
 
         val realm = Realm.getInstance(realmconfig)
@@ -351,6 +399,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
     override fun onSelectionChanged(count: Int) {
         this.selectionCount = count
+
         /*
         menu.findItem(R.id.action_delete).setVisible(count > 0)
         menu.findItem(R.id.action_copy).setVisible(count > 0)
@@ -368,6 +417,13 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         }, 1000)
 
          */
+    }
+
+
+    private fun viewMessage(position:Int) {
+        val offset = messagesListView.height / 2
+        val llm = (messagesListView.layoutManager as LinearLayoutManager)
+        llm.scrollToPositionWithOffset(position, offset)
     }
 
 
@@ -508,6 +564,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             }
             R.id.findMessage -> {
                 searchVisible = !searchVisible
+                showKeyboard(this, searchVisible)
                 toggleFilterView(searchVisible)
                 true
             }
@@ -579,14 +636,18 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
     }
 
 
+    private fun showToast(text:String, offset:Int=-1) : Toast {
+        var newoffset = if (offset >= 0) offset else appBar.height
+        val toast = Toast.makeText(this, text, Toast.LENGTH_SHORT)
+        toast.setGravity(Gravity.TOP, 0, newoffset)
+        toast.show()
+        return toast
+    }
+
+
     private fun saveLog() {
 
-//        var offset=appBar.height + progressBarHolder.height + if (query.visibility==View.VISIBLE) query.height else 0
-        var offset = appBar.height
-        val toast = Toast.makeText(this, "Saving ... ", Toast.LENGTH_SHORT)
-        toast.setGravity(Gravity.TOP, 0, offset)
-        toast.show()
-
+        val toast=showToast("Saving ...")
         val runnable = Runnable {
             val realm = Realm.getInstance(realmconfig) ?: return@Runnable
 
@@ -600,6 +661,7 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
                     it.deleteAll()
                 }
                 useDatabase = false
+                config.useDatabase = useDatabase
             }
 
             val messagesize=mMessageData.size.toLong()
@@ -627,7 +689,8 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
             //        }
 
             useDatabase = true
-
+            // saved db is important
+            config.useDatabase = useDatabase
             runOnUiThread {
                 progressBarHolder.visibility = View.GONE
 
@@ -644,11 +707,9 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
 
 
     private fun openLog(uri: Uri) {
-        val offset =
-            appBar.height + progressBarHolder.height + if (progressBar.visibility == View.VISIBLE) progressBar.height else 0
-        val toast = Toast.makeText(this, "Importing file ... ", Toast.LENGTH_SHORT)
-        toast.setGravity(Gravity.TOP, 0, offset)
-        toast.show()
+//        val offset =
+//            appBar.height + progressBarHolder.height + if (progressBar.visibility == View.VISIBLE) progressBar.height else 0
+        val toast = showToast("Importing ...")
 
         val runnable = Runnable {
             val reader = KKTChatTextReader(this, config.authorId)
@@ -742,5 +803,26 @@ class MainActivity : AppCompatActivity(), MessagesListAdapter.SelectionListener,
         }
     }
 
+    override fun onMessageLongClick(message: KKTMessage?) {
+        val clipboard=getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val clip=ClipData.newPlainText("label", message!!.messageText);
+        clipboard.setPrimaryClip(clip)
 
+        showToast("Copied to clipboard")
+    }
+
+    // not working smoothly
+    fun showKeyboard(activity: Activity, show:Boolean) {
+        val imm  = activity.getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager
+        var view = activity.getCurrentFocus();
+        if (view == null) {
+            view = View(activity);
+        }
+        if (show) {
+            imm.showSoftInput(view, 0)
+        } else {
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0)
+//            view.clearFocus()
+        }
+    }
 }
