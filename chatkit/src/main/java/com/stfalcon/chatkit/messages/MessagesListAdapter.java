@@ -439,7 +439,8 @@ public class MessagesListAdapter<MESSAGE extends IMessage>
 
     /**
      * Returns the list of selected messages.
-     *
+     *   pair.first : item position including date header
+     *   pair.second : message
      * @return list of selected messages. Empty list if nothing was selected or selection mode is disabled.
      */
     @SuppressWarnings("unchecked")
@@ -452,6 +453,27 @@ public class MessagesListAdapter<MESSAGE extends IMessage>
         }
         return selectedMessages;
     }
+
+
+    /**
+     * Returns the list of selected messages.
+     *   pair.first : item position including date header
+     *   pair.second : message
+     * @return list of selected messages. Empty list if nothing was selected or selection mode is disabled.
+     */
+    @SuppressWarnings("unchecked")
+    public ArrayList<Pair<Integer, MESSAGE>> getSelectedMessageWithPosition() {
+        ArrayList<Pair<Integer, MESSAGE>> selectedMessages = new ArrayList<>();
+        Integer i=0;
+        for (Wrapper wrapper : items) {
+            if (wrapper.item instanceof IMessage && wrapper.isSelected) {
+                selectedMessages.add(new Pair(i, wrapper.item));
+            }
+            i+=1;
+        }
+        return selectedMessages;
+    }
+
 
     /**
      * Returns selected messages text and do {@link #unselectAllItems()} for you.
@@ -494,6 +516,18 @@ public class MessagesListAdapter<MESSAGE extends IMessage>
         }
         isSelectionModeEnabled = false;
         selectedItemsCount = 0;
+        notifySelectionChanged();
+    }
+
+    public void unSelectItems(ArrayList<Integer> positions) {
+        for (Integer i : positions) {
+            Wrapper wrapper = items.get(i);
+            if (wrapper.isSelected) {
+                selectedItemsCount--;
+                wrapper.isSelected = false;
+                notifyItemChanged(i);
+            }
+        }
         notifySelectionChanged();
     }
 

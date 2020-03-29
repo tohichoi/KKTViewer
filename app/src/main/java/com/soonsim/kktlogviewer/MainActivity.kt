@@ -1,11 +1,9 @@
 package com.soonsim.kktlogviewer
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.DatePickerDialog
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
+import android.content.*
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -19,9 +17,11 @@ import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isInvisible
 import androidx.core.widget.doOnTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.datepicker.CalendarConstraints
 import com.google.android.material.datepicker.MaterialDatePicker
 import com.soonsim.kktlogviewer.DateConversion.Companion.getISOString
@@ -32,12 +32,15 @@ import com.stfalcon.chatkit.utils.DateFormatter
 import io.realm.*
 import kotlinx.android.synthetic.main.activity_main.*
 import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.time.DateFormatUtils
 import org.apache.commons.lang3.time.DateUtils
 import java.lang.Integer.max
 import java.lang.Integer.min
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.*
+import kotlin.math.abs
+import kotlin.properties.Delegates
 
 
 class MainActivity : AppCompatActivity(),
@@ -57,6 +60,7 @@ class MainActivity : AppCompatActivity(),
     private var lastQueryText = ""
     private var lastViewedDate = 0L
     private var useDatabase = false
+    private var appBarLayoutHeight = 0
     val onProgressListener = MyOnProgressListener()
 
     class KKTDateFormatter : DateFormatter.Formatter {
@@ -126,19 +130,33 @@ class MainActivity : AppCompatActivity(),
 //                        currentDate
                         fab_down.show()
                         fab_up.show()
-                        config.lastViewedPosition = lastViewedPosition
-                    }
-                    else -> {
                         val pos =
                             (messagesListView.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition()
-                        if (pos != RecyclerView.NO_POSITION)
+                        if (pos != RecyclerView.NO_POSITION) {
                             lastViewedPosition = pos.toLong()
+                            config.lastViewedPosition = lastViewedPosition
+                        }
+                    }
+                    else -> {
                         fab_down.hide()
                         fab_up.hide()
                     }
                 }
             }
         })
+
+        appBarLayout.addOnOffsetChangedListener(AppBarLayout.OnOffsetChangedListener { appBarLayout, verticalOffset ->
+            if (abs(verticalOffset) - appBarLayout.totalScrollRange == 0) {
+                // Collapsed
+                appBarLayoutHeight=0
+            } else if (verticalOffset == 0) {
+                // Expanded
+                appBarLayoutHeight=appBarLayout.height
+            } else {
+                // Idle
+            }
+        }
+        )
 
         fab_up.setOnLongClickListener(object : View.OnLongClickListener {
             override fun onLongClick(v: View?): Boolean {
@@ -232,8 +250,9 @@ class MainActivity : AppCompatActivity(),
         }
 
         if (lastViewedPosition >= 0) {
-            val llm = (messagesListView.layoutManager as LinearLayoutManager)
-            llm.scrollToPositionWithOffset(lastViewedPosition.toInt(), appBar.height)
+//            val llm = (messagesListView.layoutManager as LinearLayoutManager)
+//            llm.scrollToPositionWithOffset(lastViewedPosition.toInt(), appBar.height)
+            viewMessage(lastViewedPosition.toInt())
         }
     }
 
@@ -400,6 +419,13 @@ class MainActivity : AppCompatActivity(),
     override fun onSelectionChanged(count: Int) {
         this.selectionCount = count
 
+        if (mMenu == null) return
+
+        val item:MenuItem?=mMenu?.findItem(R.id.copyMessage)
+        if (item == null) return
+
+        item.isVisible=count > 0
+
         /*
         menu.findItem(R.id.action_delete).setVisible(count > 0)
         menu.findItem(R.id.action_copy).setVisible(count > 0)
@@ -420,10 +446,10 @@ class MainActivity : AppCompatActivity(),
     }
 
 
-    private fun viewMessage(position:Int) {
-        val offset = messagesListView.height / 2
+    private fun viewMessage(position:Int, offset:Int=-1) {
+        val newoffset = (messagesListView.height - appBarLayoutHeight) / 2
         val llm = (messagesListView.layoutManager as LinearLayoutManager)
-        llm.scrollToPositionWithOffset(position, offset)
+        llm.scrollToPositionWithOffset(position, if (offset >= 0) offset else newoffset)
     }
 
 
@@ -453,7 +479,7 @@ class MainActivity : AppCompatActivity(),
             val vdate = messagesListView.findViewHolderForAdapterPosition(datePos)
 //            val dateheadersize=if (adapter.dateHeaderHeight==0) spToPx(resources.getDimension(R.dimen.message_date_header_text_size), this) else adapter.dateHeaderHeight
             val dateheadersize = adapter.dateHeaderHeight
-            val offset = messagesListView.bottom - dateheadersize - if (appBar.visibility==View.VISIBLE) appBar.height else 0
+            val offset = messagesListView.bottom - dateheadersize - appBarLayoutHeight
             llm.scrollToPositionWithOffset(absDatePos, offset)
         }
     }
@@ -568,10 +594,48 @@ class MainActivity : AppCompatActivity(),
                 toggleFilterView(searchVisible)
                 true
             }
+            R.id.copyMessage -> {
+                copyMessages()
+                true
+            }
             else -> {
                 super.onOptionsItemSelected(item)
             }
         }
+    }
+
+    private fun copyMessages(): Boolean {
+
+        val sm=adapter.selectedMessageWithPosition
+        var s=""
+        for (item in sm) {
+            s+=DateFormatUtils.ISO_8601_EXTENDED_DATETIME_TIME_ZONE_FORMAT.format(item.second.createdAt) + "\n"
+            s+=item.second.messageText + "\n"
+        }
+
+        val clipboard=getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val clip=ClipData.newPlainText("text", s)
+        clipboard.setPrimaryClip(clip)
+
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Confirm")
+        builder.setMessage("Unselect copied messages?")
+        builder.setPositiveButton(getString(R.string.yes),
+            DialogInterface.OnClickListener { dialog, id ->
+                // User clicked OK button
+                val positions=ArrayList<Int>()
+                for (item in sm) {
+                    val pos=item.first
+                    positions.add(pos)
+                }
+                adapter.unSelectItems(positions)
+            })
+        builder.setNegativeButton(getString(R.string.no), null)
+        builder.show()
+
+        showToast("${adapter.selectedMessages.size} messages copied")
+
+        return true
     }
 
     private fun openDb(): Boolean {
@@ -637,7 +701,7 @@ class MainActivity : AppCompatActivity(),
 
 
     private fun showToast(text:String, offset:Int=-1) : Toast {
-        var newoffset = if (offset >= 0) offset else appBar.height
+        var newoffset = if (offset >= 0) offset else appBarLayout.height
         val toast = Toast.makeText(this, text, Toast.LENGTH_SHORT)
         toast.setGravity(Gravity.TOP, 0, newoffset)
         toast.show()
@@ -728,6 +792,8 @@ class MainActivity : AppCompatActivity(),
                 useDatabase = false
                 lastQueryText = ""
 
+                progressBar.isIndeterminate=true
+
                 adapter.clear()
                 adapter.addToEnd(mMessageData, true)
                 adapter.notifyDataSetChanged()
@@ -805,7 +871,7 @@ class MainActivity : AppCompatActivity(),
 
     override fun onMessageLongClick(message: KKTMessage?) {
         val clipboard=getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        val clip=ClipData.newPlainText("label", message!!.messageText);
+        val clip=ClipData.newPlainText("text", message!!.messageText);
         clipboard.setPrimaryClip(clip)
 
         showToast("Copied to clipboard")

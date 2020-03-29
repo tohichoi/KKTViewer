@@ -9,10 +9,17 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/copyMessage"
+        android:icon="@drawable/file_copy"
+        android:title="Copy message"
+        android:visible="false"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/moveToDay"
         android:icon="@drawable/event_note"
         android:title="Move to day"
-        app:showAsAction="always" />
+        app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/openLog"
@@ -25,6 +32,6 @@
         android:icon="@drawable/save"
         android:title="Save"
         android:visible="false"
-        app:showAsAction="always" />
+        app:showAsAction="ifRoom" />
 
 </menu>

@@ -48,6 +48,7 @@ class KKTChatTextReader(private val context: Context, private val myName: String
     companion object {
         val TIME_PATTERN = """(\d{4})년 (\d{1,2})월 (\d{1,2})일 (오후|오전) (\d{1,2}):(\d{1,2})"""
         val MESSAGE_PATTERN = """, ([^:]+) : (.+)$"""
+        val SYSTEM_MESSAGE_PATTERN = """, ([^:]+)$"""
         val IMAGE_PATTERN = """(jpg|jpeg|gif|bmp|png|tif|tiff|tga|psd|ai)$"""
         val VIDEO_PATTERN = """(mp4|m4v|avi|asf|wmv|mkv|ts|mpg|mpeg|mov|flv|ogv)$"""
         val AUDIO_PATTERN = """(mp3|wav|flac|tta|tak|aac|wma|ogg|m4a)$"""
@@ -59,58 +60,86 @@ class KKTChatTextReader(private val context: Context, private val myName: String
             Pair(FileType.AUDIO, NAME_PATTERN + AUDIO_PATTERN),
             Pair(FileType.DATA, NAME_PATTERN + DATA_PATTERN)
         )
-        var messageTime = 1
 
         enum class FileType {
             IMAGE, VIDEO, AUDIO, DATA, NONE
         }
 
         enum class LineType {
-            HEADER, SAVING_TIME, CHUNK_START, MESSAGE, MESSAGE_CONTINUED, NONE
+            HEADER, SAVING_TIME, CHUNK_START, MESSAGE, SYSTEM_MESSAGE, MESSAGE_CONTINUED,
+            PART_TIME, PART_SYSTEM_MESSAGE, PART_MESSAGE, NONE
         }
 
-        fun parseMedia(text: String): Pair<FileType, String?> {
-            var res1: MatchResult?
+        val regexMap:HashMap<LineType, Regex> = hashMapOf(
+            LineType.HEADER to Regex("(.+) 카카오톡 대화$"),
+            LineType.SAVING_TIME to Regex("저장한 날짜 : $TIME_PATTERN"),
+            LineType.CHUNK_START to Regex(TIME_PATTERN + "$"),
+            LineType.SYSTEM_MESSAGE to Regex(TIME_PATTERN + SYSTEM_MESSAGE_PATTERN),
+            LineType.MESSAGE to Regex(TIME_PATTERN + MESSAGE_PATTERN),
+            LineType.PART_MESSAGE to Regex(MESSAGE_PATTERN),
+            LineType.PART_SYSTEM_MESSAGE to Regex(SYSTEM_MESSAGE_PATTERN),
+            LineType.PART_TIME to Regex(TIME_PATTERN)
+        )
 
-            for (item in patarr) {
-                res1 = Regex(item.second).find(text)
-                if (res1 != null)
-                    return Pair(item.first, text.trim())
-            }
+        var messageTime = 1
+    }
 
-            return Pair(FileType.NONE, null)
+
+    fun parseMedia(text: String): Pair<FileType, String?> {
+        var res1: MatchResult?
+
+        for (item in patarr) {
+            res1 = Regex(item.second).find(text)
+            if (res1 != null)
+                return Pair(item.first, text.trim())
         }
 
-        fun parseDateTimeExpr(line: String): Pair<Date, Int>? {
-            val res1: MatchResult? = Regex(TIME_PATTERN).find(line)
+        return Pair(FileType.NONE, null)
+    }
+
+    fun parseDateTimeExpr(line: String): Pair<Date, Int>? {
+        val res1: MatchResult? = regexMap[LineType.PART_TIME]!!.find(line)
+        if (res1 != null) {
+            val gv = res1.groupValues
+            val lt = LocalDateTime.of(
+                gv[1].toInt(),
+                gv[2].toInt(),
+                gv[3].toInt(),
+                if (gv[4] == "오전") gv[5].toInt() else gv[5].toInt().rem(12) + 12,
+                gv[6].toInt()
+            )
+            val dt2 = Date.from(lt.atZone(ZoneId.systemDefault()).toInstant())
+            return Pair<Date, Int>(dt2, res1.range.last)
+        }
+        return null
+    }
+
+    fun parseSystemMessageExpr(line: String): Triple<Date, String, String>? {
+        var nick = "<Unknown>"
+        var text = ""
+        val dtexpr: Pair<Date, Int>? = parseDateTimeExpr(line)
+
+        if (dtexpr != null) {
+            val res1: MatchResult? = regexMap[LineType.PART_SYSTEM_MESSAGE]!!.find(line, dtexpr.second)
             if (res1 != null) {
-                val gv = res1.groupValues
-                val lt = LocalDateTime.of(
-                    gv[1].toInt(),
-                    gv[2].toInt(),
-                    gv[3].toInt(),
-                    if (gv[4] == "오전") gv[5].toInt() else gv[5].toInt().rem(12) + 12,
-                    gv[6].toInt()
-                )
-                val dt2 = Date.from(lt.atZone(ZoneId.systemDefault()).toInstant())
-                return Pair<Date, Int>(dt2, res1.range.last)
+                return Triple(dtexpr.first, "SYSTEM", res1.groupValues[1] + "\n")
             }
-            return null
         }
+        return null
+    }
 
-        fun parseMessageExpr(line: String): Triple<Date, String, String>? {
-            var nick = "<Unknown>"
-            var text = ""
-            val dtexpr: Pair<Date, Int>? = parseDateTimeExpr(line)
+    fun parseMessageExpr(line: String): Triple<Date, String, String>? {
+        var nick = "<Unknown>"
+        var text = ""
+        val dtexpr: Pair<Date, Int>? = parseDateTimeExpr(line)
 
-            if (dtexpr != null) {
-                val res1: MatchResult? = Regex(MESSAGE_PATTERN).find(line)
-                if (res1 != null) {
-                    return Triple(dtexpr.first, res1.groupValues[1], res1.groupValues[2] + "\n")
-                }
+        if (dtexpr != null) {
+            val res1: MatchResult? = regexMap[LineType.PART_MESSAGE]!!.find(line, dtexpr.second)
+            if (res1 != null) {
+                return Triple(dtexpr.first, res1.groupValues[1], res1.groupValues[2] + "\n")
             }
-            return null
         }
+        return null
     }
 
 
@@ -118,22 +147,27 @@ class KKTChatTextReader(private val context: Context, private val myName: String
         var mr: MatchResult? = null
         var message = KKTMessage()
 
-        mr = Regex("(.+) 카카오톡 대화$").find(line)
+        mr = regexMap[LineType.HEADER]!!.find(line)
         if (mr != null) {
             return Pair(LineType.HEADER, mr.groupValues[1])
         }
 
-        mr = Regex("저장한 날짜 : $TIME_PATTERN").find(line)
+        mr = regexMap[LineType.SAVING_TIME]!!.find(line)
         if (mr != null) {
             return Pair(LineType.SAVING_TIME, parseDateTimeExpr(line.substring(mr.range))?.first)
         }
 
-        mr = Regex(TIME_PATTERN + "$").find(line)
+        mr = regexMap[LineType.CHUNK_START]!!.find(line)
         if (mr != null) {
             return Pair(LineType.CHUNK_START, parseDateTimeExpr(line.substring(mr.range))?.first)
         }
 
-        mr = Regex(TIME_PATTERN + """, ([^:])+: (.+)""").find(line)
+        mr = regexMap[LineType.SYSTEM_MESSAGE]!!.find(line)
+        if (mr != null) {
+            return Pair(LineType.SYSTEM_MESSAGE, parseSystemMessageExpr(line))
+        }
+
+        mr = regexMap[LineType.MESSAGE]!!.find(line)
         if (mr != null) {
             return Pair(LineType.MESSAGE, parseMessageExpr(line))
         }
@@ -287,6 +321,11 @@ class KKTChatTextReader(private val context: Context, private val myName: String
                             continue@loop
                         }
                     }
+                    LineType.SYSTEM_MESSAGE -> {
+                        val res2 = res.second as Triple<Date, String, String>
+                        insertMessage(messageList, res2.first, res2.second, res2.third)
+                        continue@loop
+                    }
                     else -> {
                         throw IOException()
                     }
@@ -304,6 +343,7 @@ class KKTChatTextReader(private val context: Context, private val myName: String
 
         return messageList
     }
+
 
     private fun insertMessage(
         messageList: ArrayList<KKTMessage>,
