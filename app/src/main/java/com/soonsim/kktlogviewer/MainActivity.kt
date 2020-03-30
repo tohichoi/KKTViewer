@@ -717,10 +717,10 @@ class MainActivity : AppCompatActivity(),
 
             runOnUiThread {
                 progressBarHolder.visibility = View.VISIBLE
-//                progressBar.isIndeterminate = true
+                progressBar.isIndeterminate = false
             }
 
-            if (useDatabase) {
+            if (useDatabase || !realm.isEmpty) {
                 realm.executeTransaction {
                     it.deleteAll()
                 }
@@ -735,8 +735,8 @@ class MainActivity : AppCompatActivity(),
                     if (message.isNull())
                         continue
                     val m = message
-                    it.copyToRealmOrUpdate(m)
-
+//                    it.copyToRealmOrUpdate(m)
+                    it.insertOrUpdate(m)
                     runOnUiThread {
                         onProgressListener.onProgressChanged((index+1).toLong(), messagesize)
                     }
@@ -762,7 +762,6 @@ class MainActivity : AppCompatActivity(),
                 toast.setText("Successfully saved")
                 toast.show()
             }
-            realm.close()
         }
 
         val thread = Thread(runnable)
