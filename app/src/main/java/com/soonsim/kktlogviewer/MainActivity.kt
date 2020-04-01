@@ -577,7 +577,11 @@ class MainActivity : AppCompatActivity(),
         return when (item.itemId) {
             R.id.openLog -> {
 //                openLog()
-                getLogFilePathFromUser()
+                getLogFilePathFromUser(REQUEST_CODE_IMPORT_TEXT)
+                true
+            }
+            R.id.mergeLog -> {
+                getLogFilePathFromUser(REQUEST_CODE_MERGE_TEXT)
                 true
             }
             R.id.saveLog -> {
@@ -837,7 +841,7 @@ class MainActivity : AppCompatActivity(),
 //        }
     }
 
-    private fun getLogFilePathFromUser() {
+    private fun getLogFilePathFromUser(reqcode:Int) {
         var intent: Intent = Intent()
             .setType("text/*")
             .setAction(Intent.ACTION_GET_CONTENT)
@@ -845,7 +849,7 @@ class MainActivity : AppCompatActivity(),
 
         startActivityForResult(
             Intent.createChooser(intent, "Select a file"),
-            REQUEST_CODE_IMPORT_TEXT
+            reqcode
         )
     }
 
@@ -859,6 +863,12 @@ class MainActivity : AppCompatActivity(),
                     openLog(uri!!)
                 }//The uri with the location of the file
             }
+            REQUEST_CODE_MERGE_TEXT -> {
+                if (resultCode == Activity.RESULT_OK && data != null) {
+                    var uri: Uri? = data.data ?: return
+                    mergeLog(uri!!)
+                }//The uri with the location of the file
+            }
             REQUEST_CODE_OPEN_DB -> {
                 if (resultCode == Activity.RESULT_OK && data != null) {
                     var uri: Uri? = data.data ?: return
@@ -867,6 +877,89 @@ class MainActivity : AppCompatActivity(),
             }
         }
     }
+
+    private fun mergeLog(uri: Uri) {
+        val toast = showToast("Merging ...")
+
+        val runnable = Runnable {
+            val reader = KKTChatTextReader(this, config.authorId)
+            reader.setOnProgressChanged(onProgressListener)
+
+            runOnUiThread {
+                progressBarHolder.visibility = View.VISIBLE
+                progressBar.isIndeterminate = false
+            }
+
+            val newMessageData = reader.readFile(uri)
+
+            runOnUiThread {
+                progressBar.isIndeterminate = true
+            }
+
+            val delta=mergeMessageData(mMessageData.asReversed(), newMessageData)
+
+            runOnUiThread {
+                lastViewedDate = 0L
+                lastViewedPosition = 0L
+                useDatabase = false
+                lastQueryText = ""
+
+                adapter.clear()
+                adapter.addToEnd(mMessageData, false)
+                adapter.notifyDataSetChanged()
+
+                for (item in listOf(R.id.saveLog, R.id.moveToDay, R.id.findMessage)) {
+                    toggleMenuItemEnabled(item, mMessageData.isNotEmpty())
+                }
+                toggleMenuItemVisible(R.id.saveLog, true)
+
+                progressBarHolder.visibility = View.GONE
+
+                toast.setText("Merged $delta messages")
+                toast.show()
+            }
+        }
+        val thread = Thread(runnable)
+        thread.start()
+    }
+
+    private fun mergeMessageData(
+        mMessageData: MutableList<KKTMessage>,
+        newMessageData: MutableList<KKTMessage>
+    ) : Int {
+        val s0 = mMessageData.first().messageTime!!
+        val e0 = mMessageData.last().messageTime!!
+        val s1 = newMessageData.first().messageTime!!
+        val e1 = newMessageData.last().messageTime!!
+        val size0=mMessageData.size
+
+        if (s0 > s1 && e0 > e1) {
+            // 이전 메시지
+            mMessageData.addAll(0, newMessageData.filter{
+                it.createdAt!!.toInstant().toEpochMilli() <= s0.toInstant().toEpochMilli()
+            })
+        } else if (s0 > s1 && e0 < e1) {
+            mMessageData.addAll(0, newMessageData.filter{
+                it.createdAt!!.toInstant().toEpochMilli() <= s0.toInstant().toEpochMilli()
+            })
+            mMessageData.addAll(newMessageData.filter {
+                it.createdAt!!.toInstant().toEpochMilli() >= e0.toInstant().toEpochMilli()
+            })
+        } else if (s0 < s1 && e0 > e1) {
+            // no message to import
+        } else { // (s0 < s1 && e0 < e1)
+            mMessageData.addAll(newMessageData.filter {
+                it.createdAt!!.toInstant().toEpochMilli() >= e0.toInstant().toEpochMilli()
+            })
+        }
+
+        mMessageData.sortBy {
+            it.createdAt
+        }
+
+        return (mMessageData.size-size0)
+    }
+
 
     override fun onMessageLongClick(message: KKTMessage?) {
         val clipboard=getSystemService(CLIPBOARD_SERVICE) as ClipboardManager

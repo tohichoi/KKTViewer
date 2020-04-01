@@ -28,6 +28,12 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/mergeLog"
+        android:icon="@drawable/merge_type"
+        android:title="Open log..."
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/saveLog"
         android:icon="@drawable/save"
         android:title="Save"

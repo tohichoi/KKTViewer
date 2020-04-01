@@ -516,18 +516,22 @@ public class MessagesListAdapter<MESSAGE extends IMessage>
         }
         isSelectionModeEnabled = false;
         selectedItemsCount = 0;
+        selectedItemPosition.clear();
         notifySelectionChanged();
     }
 
     public void unSelectItems(ArrayList<Integer> positions) {
+        ArrayList<Integer> toDeleteIndex=new ArrayList<Integer>();
         for (Integer i : positions) {
             Wrapper wrapper = items.get(i);
             if (wrapper.isSelected) {
                 selectedItemsCount--;
                 wrapper.isSelected = false;
+                toDeleteIndex.add(i);
                 notifyItemChanged(i);
             }
         }
+        selectedItemPosition.removeAll(toDeleteIndex);
         notifySelectionChanged();
     }
 
