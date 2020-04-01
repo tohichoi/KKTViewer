@@ -716,60 +716,46 @@ class MainActivity : AppCompatActivity(),
     private fun saveLog() {
 
         val toast=showToast("Saving ...")
-        val runnable = Runnable {
-            val realm = Realm.getInstance(realmconfig) ?: return@Runnable
+        val realm = Realm.getInstance(realmconfig) ?: return
 
-            runOnUiThread {
-                progressBarHolder.visibility = View.VISIBLE
-                progressBar.isIndeterminate = false
-            }
+        progressBarHolder.visibility = View.VISIBLE
+        progressBar.isIndeterminate = false
 
-            if (useDatabase || !realm.isEmpty) {
-                realm.executeTransaction {
-                    it.deleteAll()
-                }
-                useDatabase = false
-                config.useDatabase = useDatabase
-            }
-
-            val messagesize=mMessageData.size.toLong()
+        if (useDatabase || !realm.isEmpty) {
             realm.executeTransaction {
-                for ((index, message) in mMessageData.withIndex()) {
-                    // date message inserted by ChatKit
-                    if (message.isNull())
-                        continue
-                    val m = message
-//                    it.copyToRealmOrUpdate(m)
-                    it.insertOrUpdate(m)
-                    runOnUiThread {
-                        onProgressListener.onProgressChanged((index+1).toLong(), messagesize)
-                    }
-                }
+                it.deleteAll()
             }
-
-            // test
-            //        var res: RealmResults<KKTMessage>
-            //        res=realm.where(KKTMessage::class.java).findAll()
-            //        var resarr=ArrayList<KKTMessage>()
-            //        resarr.addAll(res.subList(0, res.size))
-            //        for (item in resarr) {
-            //            Log.d("mike", "${item.author}")
-            //        }
-
-            useDatabase = true
-            // saved db is important
+            useDatabase = false
             config.useDatabase = useDatabase
-            runOnUiThread {
-                progressBarHolder.visibility = View.GONE
+        }
 
-                toggleMenuItemVisible(R.id.saveLog, false)
-                toast.setText("Successfully saved")
-                toast.show()
+        // if we run this code block in background thread, exception occurs.
+        //     java.lang.IllegalStateException: Realm access from incorrect thread.
+        //     Realm objects can only be accessed on the thread they were created.
+        val messagesize=mMessageData.size.toLong()
+        realm.executeTransactionAsync {
+            for ((index, message) in mMessageData.withIndex()) {
+                // date message inserted by ChatKit
+                if (message.isNull())
+                    continue
+                val m = message
+//                    it.copyToRealmOrUpdate(m)
+                it.insertOrUpdate(m)
+                runOnUiThread {
+                    onProgressListener.onProgressChanged((index+1).toLong(), messagesize)
+                }
             }
         }
 
-        val thread = Thread(runnable)
-        thread.start()
+        useDatabase = true
+        // saved db is important
+        config.useDatabase = useDatabase
+        progressBarHolder.visibility = View.GONE
+
+        toggleMenuItemVisible(R.id.saveLog, false)
+        toast.setText("Successfully saved")
+        toast.show()
+
     }
 
 
@@ -896,9 +882,9 @@ class MainActivity : AppCompatActivity(),
                 progressBar.isIndeterminate = true
             }
 
-            val delta=mergeMessageData(mMessageData.asReversed(), newMessageData)
-
             runOnUiThread {
+                val delta=mergeMessageData(mMessageData.asReversed(), newMessageData)
+
                 lastViewedDate = 0L
                 lastViewedPosition = 0L
                 useDatabase = false
