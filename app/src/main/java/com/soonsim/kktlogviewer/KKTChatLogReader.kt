@@ -340,6 +340,7 @@ class KKTChatTextReader(private val context: Context, private val myName: String
             Thread.currentThread().interrupt()
         } finally {
             br.close()
+            ins.close()
             prog?.onProgressChanged(filesize, filesize)
 //            Log.d("mike", "Chuck count = $chunkcount")
         }
