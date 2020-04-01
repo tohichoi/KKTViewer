@@ -890,7 +890,7 @@ class MainActivity : AppCompatActivity(),
                 progressBar.isIndeterminate = false
             }
 
-            val newMessageData = reader.readFile(uri)
+            val newMessageData = reader.readFile(uri, mMessageData.size)
 
             runOnUiThread {
                 progressBar.isIndeterminate = true

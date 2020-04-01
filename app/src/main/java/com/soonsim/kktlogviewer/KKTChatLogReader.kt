@@ -37,6 +37,7 @@ class KKTChatTextReader(private val context: Context, private val myName: String
         fun onProgressChanged(position: Long, totalCount: Long)
     }
 
+    var startingId:Int?=null
     var dataDirectory: String = ""
     var uri: Uri? = null
     var prog: OnProgressListener? = null
@@ -226,7 +227,7 @@ class KKTChatTextReader(private val context: Context, private val myName: String
         return s
     }
 
-    fun readFile(uri: Uri? = null): ArrayList<KKTMessage> {
+    fun readFile(uri: Uri? = null, startingId:Int?=null): ArrayList<KKTMessage> {
         val messageList = ArrayList<KKTMessage>()
         var count = 0
         var chunkcount = 0
@@ -238,6 +239,8 @@ class KKTChatTextReader(private val context: Context, private val myName: String
         var prevlt: LineType = LineType.NONE
         var filesize = 0L
         var readsize = 0L
+
+        this.startingId=startingId
 
         dataDirectory = File(uri?.path!!).parent!!
 
@@ -351,7 +354,7 @@ class KKTChatTextReader(private val context: Context, private val myName: String
         nick: String,
         text: String
     ) {
-        val msgId = messageList.size.toString()
+        val msgId = (messageList.size + if (startingId != null) startingId!! else 0).toString()
         val name = if (myName != null && nick == "회원님") myName else nick
         val author = KKTAuthor(name, name, null)
 //        val message=KKTMessage(msgId, text.trim(), author, time)
