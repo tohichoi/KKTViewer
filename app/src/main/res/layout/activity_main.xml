@@ -66,9 +66,10 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <RelativeLayout
-        android:id="@+id/contents"
+    <LinearLayout
         android:layout_width="match_parent"
+        android:orientation="vertical"
+        android:id="@+id/contents"
         android:layout_height="match_parent">
 
         <com.stfalcon.chatkit.messages.MessagesList
@@ -78,7 +79,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1" />
 
-    </RelativeLayout>
+    </LinearLayout>
 
     <RelativeLayout
         android:layout_width="wrap_content"

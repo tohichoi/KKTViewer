@@ -72,5 +72,10 @@
         <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
     </style>
 
+    <style name="RecyclerViewFastScrollerText">
+        <item name="android:colorBackground">@color/colorAccent</item>
+        <item name="android:textColor">@android:color/primary_text_light</item>
+    </style>
+
 
 </resources>

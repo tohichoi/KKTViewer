@@ -50,7 +50,6 @@ open class KKTMessage(
         return imgUrl
     }
 
-
     fun isNull(): Boolean {
         return messageId == null || messageTime == null
     }
