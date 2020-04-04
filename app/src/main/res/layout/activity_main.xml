@@ -44,22 +44,25 @@
         <LinearLayout
             android:id="@+id/progressBarHolder"
             android:layout_width="match_parent"
-            android:layout_height="16dp"
-            android:orientation="horizontal"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
             app:layout_scrollFlags="scroll|snap|enterAlways">
 
             <ProgressBar
                 android:id="@+id/progressBar"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="16dp"
                 android:layout_gravity="center_vertical"
                 android:indeterminate="false" />
 
             <TextView
                 android:id="@+id/progressText"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="5dp"
+                android:paddingStart="5dp"
+                android:paddingEnd="5dp"
                 android:layout_gravity="center_vertical|right"
                 android:text="OO/OOO" />
         </LinearLayout>

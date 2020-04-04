@@ -30,13 +30,12 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.SimpleItemAnimator;
 
-import com.simplecityapps.recyclerview_fastscroll.views.FastScrollRecyclerView;
 import com.stfalcon.chatkit.commons.models.IMessage;
 
 /**
  * Component for displaying list of messages
  */
-public class MessagesList extends FastScrollRecyclerView {
+public class MessagesList extends RecyclerView {
     private MessagesListStyle messagesListStyle;
 
     public MessagesList(Context context) {

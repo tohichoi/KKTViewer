@@ -19,7 +19,7 @@
         android:id="@+id/moveToDay"
         android:icon="@drawable/event_note"
         android:title="Move to day"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/openLog"
@@ -34,10 +34,9 @@
         app:showAsAction="always" />
 
     <item
-        android:id="@+id/saveLog"
-        android:icon="@drawable/save"
-        android:title="Save"
-        android:visible="false"
+        android:id="@+id/deleteDb"
+        android:icon="@drawable/delete_forever"
+        android:title="Delete data"
+        android:visible="true"
         app:showAsAction="ifRoom" />
-
 </menu>

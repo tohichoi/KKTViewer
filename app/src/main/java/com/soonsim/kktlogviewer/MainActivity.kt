@@ -2,38 +2,34 @@ package com.soonsim.kktlogviewer
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.app.DatePickerDialog
 import android.content.*
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.Message
 import android.util.Log
 import android.util.TypedValue
-import android.view.Gravity
-import android.view.Menu
-import android.view.MenuItem
-import android.view.View
+import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
 import androidx.core.widget.doOnTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.datepicker.CalendarConstraints
 import com.google.android.material.datepicker.MaterialDatePicker
-import com.simplecityapps.recyclerview_fastscroll.views.FastScrollRecyclerView
 import com.soonsim.kktlogviewer.DateConversion.Companion.getISOString
 import com.stfalcon.chatkit.commons.models.IMessage
+import com.stfalcon.chatkit.messages.MessagesList
 import com.stfalcon.chatkit.messages.MessagesListAdapter
 import com.stfalcon.chatkit.messages.MessagesListAdapter.HoldersConfig
 import com.stfalcon.chatkit.utils.DateFormatter
 import io.realm.*
-import io.realm.kotlin.createObject
 import kotlinx.android.synthetic.main.activity_main.*
-import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.time.DateFormatUtils
 import org.apache.commons.lang3.time.DateUtils
 import java.lang.Integer.max
@@ -42,8 +38,9 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.*
 import kotlin.math.abs
-import com.soonsim.kktlogviewer.MyMessageListAdapter
-import com.stfalcon.chatkit.messages.MessagesList
+
+
+const val MESSAGE_READ_COMPLETE=100
 
 
 class MainActivity : AppCompatActivity(),
@@ -52,7 +49,6 @@ class MainActivity : AppCompatActivity(),
     MessagesListAdapter.OnMessageLongClickListener<KKTMessage>  {
     private val imageLoader = KKTImageLoader(this)
     lateinit var config: KKTConfig
-    private lateinit var mDatePickerDialog: DatePickerDialog
     private var mMessageData = ArrayList<KKTMessage>()
     lateinit var adapter: MessagesListAdapter<KKTMessage>
     private var selectionCount = 0
@@ -62,11 +58,13 @@ class MainActivity : AppCompatActivity(),
     private var lastViewedPosition = 0L
     private var lastQueryText = ""
     private var lastViewedDate = 0L
-    private var useDatabase = false
     private var appBarLayoutHeight = 0
+    private var handler:Handler? = null
     private lateinit var viewManager:LinearLayoutManager
+    lateinit var messagesListViewLayoutParam:ViewGroup.LayoutParams
     private lateinit var messagesListView:MessagesList
-
+    private lateinit var realmResult:RealmResults<KKTMessage>
+    private lateinit var realmmain:Realm
 //    private var toolbar:Toolbar? = null
     val onProgressListener = MyOnProgressListener()
 
@@ -102,12 +100,10 @@ class MainActivity : AppCompatActivity(),
             lastQueryText = savedInstanceState.getString("lastQueryText")!!
             lastViewedDate = savedInstanceState.getLong("lastViewedDate")
             lastViewedPosition = savedInstanceState.getLong("lastViewedPosition")
-            useDatabase = savedInstanceState.getBoolean("useDatabase")
         } else {
             lastViewedPosition = config.lastViewedPosition
             lastQueryText = config.lastQueryText
             lastViewedDate = config.lastViewedDate
-            useDatabase = config.useDatabase
         }
 
 //        supportActionBar.setDefaultDisplayHomeAsUpEnabled(false)
@@ -252,89 +248,104 @@ class MainActivity : AppCompatActivity(),
         }
 
         Realm.init(this)
-        realmconfig = RealmConfiguration.Builder()
+        realmmain = Realm.getInstance(buildRealmConfig())
+
+        query.editText?.setText(lastQueryText)
+
+        if (lastViewedPosition >= 0) {
+            viewMessage(lastViewedPosition.toInt())
+        }
+
+        createUpdateUiHandler()
+    }
+
+    private fun createUpdateUiHandler() {
+        if (handler == null) {
+            handler = object : Handler(Looper.getMainLooper()) {
+                override fun handleMessage(msg: Message) {
+                    // Means the message is sent from child thread.
+                    if (msg.what === MESSAGE_READ_COMPLETE) {
+//                        if (realmmain.isEmpty) {
+//                            realmmain.close()
+//                            realmmain=Realm.getInstance(buildRealmConfig())
+//                        }
+//                        // Update ui in main thread.
+//                        lastViewedDate = 0L
+//                        lastViewedPosition = 0L
+//                        lastQueryText = ""
+//
+//                        progressBar.isIndeterminate = true
+//                        refreshListAndSelect(lastQueryText, false)
+//
+//                        for (item in listOf(R.id.saveLog, R.id.moveToDay, R.id.findMessage)) {
+//                            toggleMenuItemEnabled(item, mMessageData.isNotEmpty())
+//                        }
+//                        toggleMenuItemVisible(R.id.saveLog, true)
+//
+//                        progressBarHolder.visibility = View.GONE
+//
+//                        showToast("Imported ${mMessageData.size} messages")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun buildRealmConfig(): RealmConfiguration {
+        return RealmConfiguration.Builder()
             .name("kktviewer.realm")
 //            .encryptionKey(getMyKey())
             .schemaVersion(2)
             .migration(KKTRealmMigration())
             .build()
-        if (config.useDatabase) {
-            query.editText?.setText(lastQueryText)
-//            refreshList(config.lastSearchText)
-        }
-
-        if (lastViewedPosition >= 0) {
-//            val llm = (messagesListView.layoutManager as LinearLayoutManager)
-//            llm.scrollToPositionWithOffset(lastViewedPosition.toInt(), appBar.height)
-            viewMessage(lastViewedPosition.toInt())
-        }
     }
 
-    private fun refreshListAndSelect(lastQueryText: String) {
+    private fun refreshListAndSelect(query: String, controlProgress:Boolean=true) {
+        // keep selection
         val sellist=HashSet<String>()
         sellist.addAll(adapter.selectedMessages.map {
             it.messageId!!
         })
 
-        refreshList(lastQueryText)
-
-        if (sellist.isEmpty()) return
-
-        for (i in 0 until adapter.items.size) {
-            if (adapter.items[i].item is KKTMessage) {
-                if (sellist.contains((adapter.items[i].item as KKTMessage).messageId)) {
-                    adapter.items[i].isSelected = true
-                    adapter.selectedItemPosition.add(i)
-                    adapter.notifyItemChanged(i)
-                }
-            }
-        }
-    }
-
-    fun checkDbStatus(): Realm? {
-        if (!useDatabase)
-            return null
-
-        val realm = Realm.getInstance(realmconfig)
-
-        return realm
-    }
-
-    fun refreshList(query: String) {
-
-        val realm = checkDbStatus() ?: return
-
-        progressBarHolder.visibility = View.VISIBLE
-        progressBar.isIndeterminate = true
-
-        var results: RealmResults<KKTMessage>? = null
-        realm.executeTransaction {
-            results = when (StringUtils.isEmpty(query)) {
-                true -> {
-                    realm.where(KKTMessage::class.java)
-                        .findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING))
-                }
-                false -> {
-                    realm.where(KKTMessage::class.java)
-                        .contains("messageText", query, Case.INSENSITIVE)
-                        .findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING))
-                }
-            }
+//        val realm = checkDbStatus() ?: return
+        if (controlProgress) {
+            progressBarHolder.visibility = View.VISIBLE
+            progressBar.isIndeterminate = true
         }
 
-        val reslist = results?.subList(0, results!!.size)
-        mMessageData.clear()
-        mMessageData.addAll(reslist!!)
-        //        for (item in l) {
-        //            Log.d("mike", "item: ${item.toString()}")
-        //        }
+        var realmQuery=realmmain.where(KKTMessage::class.java)
+        if (query.isNotEmpty())
+            realmQuery=realmQuery.contains("messageText", query, Case.INSENSITIVE)
 
-        adapter.clear()
-        adapter.addToEnd(mMessageData, true)
-        adapter.notifyDataSetChanged()
-        adapter.currentQuery = query
+        realmResult = realmQuery.findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING))
 
-        progressBarHolder.visibility = View.GONE
+//        if (realmResult.isNotEmpty()) {
+            mMessageData.clear()
+            mMessageData.addAll(realmResult.toList())
+
+            adapter.clear()
+            adapter.addToEnd(mMessageData, true)
+            adapter.notifyDataSetChanged()
+            adapter.currentQuery = query
+
+            if (sellist.isNotEmpty()) {
+                //TODO: Selection by filter
+                for (i in 0 until adapter.items.size) {
+                    if (adapter.items[i].item is KKTMessage) {
+                        if (sellist.contains((adapter.items[i].item as KKTMessage).messageId)) {
+                            adapter.items[i].isSelected = true
+                            adapter.selectedItemPosition.add(i)
+                            adapter.notifyItemChanged(i)
+                        }
+                    }
+                }
+            }
+//2
+
+        if (controlProgress) {
+            progressBarHolder.visibility = View.GONE
+        }
+//        realmResult.addChangeListener { results, changeSet ->
     }
 
 
@@ -415,12 +426,13 @@ class MainActivity : AppCompatActivity(),
         config.lastQueryText = lastQueryText
         config.lastViewedDate = lastViewedDate
         config.lastViewedPosition = lastViewedPosition
-        config.useDatabase = useDatabase
     }
 
 
     override fun onBackPressed() {
         saveCurrentState()
+
+        realmmain.close()
 
         super.onBackPressed()
     }
@@ -499,7 +511,9 @@ class MainActivity : AppCompatActivity(),
             val vdate = messagesListView.findViewHolderForAdapterPosition(datePos)
 //            val dateheadersize=if (adapter.dateHeaderHeight==0) spToPx(resources.getDimension(R.dimen.message_date_header_text_size), this) else adapter.dateHeaderHeight
             val dateheadersize = adapter.dateHeaderHeight
-            val offset = messagesListView.bottom - dateheadersize - appBarLayoutHeight
+            var offset = messagesListView.bottom - dateheadersize - appBarLayoutHeight
+            if (absDatePos==adapter.itemCount-1)
+                offset+=appBarLayoutHeight
             llm.scrollToPositionWithOffset(absDatePos, offset)
         }
     }
@@ -571,7 +585,6 @@ class MainActivity : AppCompatActivity(),
         outState.putString("lastQueryText", lastQueryText)
         outState.putLong("lastViewedDate", lastViewedDate)
         outState.putLong("lastViewedPosition", lastViewedPosition)
-        outState.putBoolean("useDatabase", useDatabase)
 
         saveCurrentState()
 
@@ -584,7 +597,6 @@ class MainActivity : AppCompatActivity(),
         mMenu = menu
 
         // default state
-        toggleMenuItemEnabled(R.id.saveLog, !config.useDatabase && mMessageData.isNotEmpty())
         toggleMenuItemEnabled(R.id.moveToDay, mMessageData.isNotEmpty())
         toggleMenuItemEnabled(R.id.findMessage, mMessageData.isNotEmpty())
 
@@ -605,8 +617,8 @@ class MainActivity : AppCompatActivity(),
                 getLogFilePathFromUser(REQUEST_CODE_MERGE_TEXT)
                 true
             }
-            R.id.saveLog -> {
-                saveLog()
+            R.id.deleteDb -> {
+                deleteDb()
                 true
             }
             R.id.moveToDay -> {
@@ -627,6 +639,20 @@ class MainActivity : AppCompatActivity(),
                 super.onOptionsItemSelected(item)
             }
         }
+    }
+
+    private fun deleteDb() {
+        val builder=AlertDialog.Builder(this)
+            .setTitle("Confirm")
+            .setMessage("Delete current database?\n(Your file remains)")
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.ok) { _, _ ->
+                realmmain.executeTransaction {
+                    it.deleteAll()
+                }
+                refreshListAndSelect("")
+            }
+        builder.show()
     }
 
     private fun copyMessages(): Boolean {
@@ -659,17 +685,6 @@ class MainActivity : AppCompatActivity(),
         builder.show()
 
         showToast("${adapter.selectedMessages.size} messages copied")
-
-        return true
-    }
-
-    private fun openDb(): Boolean {
-        val realm = Realm.getInstance(realmconfig)
-        val result = realm.where(KKTMessage::class.java).findAll().sort("messageId", Sort.ASCENDING)
-        mMessageData.clear()
-        mMessageData.addAll(result.subList(0, result.size))
-        adapter.notifyDataSetChanged()
-        realm.close()
 
         return true
     }
@@ -734,108 +749,79 @@ class MainActivity : AppCompatActivity(),
     }
 
 
-    private fun saveLog() {
-
-        val toast=showToast("Saving ...")
-
-        progressBarHolder.visibility = View.VISIBLE
-        progressBar.isIndeterminate = false
-
-        // if we run this code block in background thread, exception occurs.
-        //     java.lang.IllegalStateException: Realm access from incorrect thread.
-        //     Realm objects can only be accessed on the thread they were created.
-        val runnable = Runnable {
-            val realm = Realm.getInstance(realmconfig) ?: return@Runnable
-            if (useDatabase || !realm.isEmpty) {
-                realm.executeTransaction {
-                    it.deleteAll()
-                }
-                useDatabase = false
-                config.useDatabase = useDatabase
-            }
-
-            val messagesize = mMessageData.size.toLong()
-            realm.executeTransaction {
-                for ((index, message) in mMessageData.withIndex()) {
-                    // date message inserted by ChatKit
-                    //                var newmessage=realm.createObject<KKTMessage>(KKTMessage::class.java)
-                    var newmessage = realm.copyToRealm(message)
-
-                    newmessage = message
-                    if (newmessage.isNull())
-                        continue
-                    //                    it.copyToRealmOrUpdate(m)
-                    it.insertOrUpdate(newmessage)
-
-                    // runOnUiThread is called in function body
-                    onProgressListener.onProgressChanged((index + 1).toLong(), messagesize)
-                }
-            }
-
-            useDatabase = true
-            // saved db is important
-            config.useDatabase = useDatabase
-
-            runOnUiThread {
-                progressBarHolder.visibility = View.GONE
-
-                toggleMenuItemVisible(R.id.saveLog, false)
-                toast.setText("Successfully saved")
-                toast.show()
-            }
-            realm.close()
-        }
-        val thread = Thread(runnable)
-        thread.start()
-    }
-
-
     private fun openLog(uri: Uri) {
 //        val offset =
 //            appBar.height + progressBarHolder.height + if (progressBar.visibility == View.VISIBLE) progressBar.height else 0
-        val toast = showToast("Importing ...")
+        val toast = showToast("Importing started ...")
+
+        realmmain.executeTransaction {
+            it.deleteAll()
+        }
 
         val runnable = Runnable {
-            val reader = KKTChatTextReader(this, config.authorId)
-            reader.setOnProgressChanged(onProgressListener)
-
             runOnUiThread {
                 progressBarHolder.visibility = View.VISIBLE
                 progressBar.isIndeterminate = false
             }
 
-            mMessageData = reader.readFile(uri)
+            val realmlocal=Realm.getInstance(buildRealmConfig())
 
             runOnUiThread {
+                progressText.text="Parsing log file ..."
+            }
+
+            val reader = KKTChatTextReader(this, config.authorId)
+            reader.setOnProgressChanged(onProgressListener)
+            val list=reader.readFile(uri)
+
+            runOnUiThread {
+                progressBar.isIndeterminate = false
+                progressText.text="Inserting messages to database ..."
+            }
+
+            realmlocal.executeTransaction { realmit ->
+                list.forEachIndexed { index, kktMessage ->
+                    realmit.insertOrUpdate(kktMessage)
+                    Thread.yield()
+                    onProgressListener.onProgressChanged((index+1).toLong(), list.size.toLong())
+                }
+            }
+
+            runOnUiThread {
+                progressBar.isIndeterminate = true
+                progressText.text="Loading messages ..."
+            }
+
+            Thread.yield()
+
+            runOnUiThread {
+                if (realmmain.isEmpty) {
+                    realmmain.close()
+                    realmmain=Realm.getInstance(buildRealmConfig())
+                }
+
                 lastViewedDate = 0L
                 lastViewedPosition = 0L
-                useDatabase = false
                 lastQueryText = ""
 
-                progressBar.isIndeterminate=true
+                progressBar.isIndeterminate = true
+                refreshListAndSelect(lastQueryText, false)
 
-                adapter.clear()
-                // case#1 : start
-//                mMessageData.forEach {
-//                    adapter.addToStart(it, false)
-//                }
-                // case#2 : end
-//                adapter.addToEnd(mMessageData, false)
-                // case#3 : end reverse
-                adapter.addToEnd(mMessageData, true)
-                adapter.notifyDataSetChanged()
-
-                for (item in listOf(R.id.saveLog, R.id.moveToDay, R.id.findMessage)) {
+                for (item in listOf(R.id.moveToDay, R.id.findMessage)) {
                     toggleMenuItemEnabled(item, mMessageData.isNotEmpty())
                 }
-                toggleMenuItemVisible(R.id.saveLog, true)
 
-                progressBar.isIndeterminate=false
                 progressBarHolder.visibility = View.GONE
 
                 toast.setText("Imported ${mMessageData.size} messages")
                 toast.show()
             }
+
+            realmlocal.close()
+
+//            val sendingmessage=Message()
+//            sendingmessage.what=MESSAGE_READ_COMPLETE
+//            handler?.sendMessage(sendingmessage)
         }
         val thread = Thread(runnable)
         thread.start()
@@ -904,41 +890,70 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun mergeLog(uri: Uri) {
-        val toast = showToast("Merging ...")
+        val toast = showToast("Merging started ...")
 
         val runnable = Runnable {
+            val realmlocal=Realm.getInstance(buildRealmConfig())
             val reader = KKTChatTextReader(this, config.authorId)
             reader.setOnProgressChanged(onProgressListener)
 
             runOnUiThread {
                 progressBarHolder.visibility = View.VISIBLE
                 progressBar.isIndeterminate = false
+                progressText.text="Parsing log file ..."
             }
 
             val newMessageData = reader.readFile(uri, mMessageData.size)
 
             runOnUiThread {
                 progressBar.isIndeterminate = true
+                progressText.text="Analyzing log file ..."
             }
 
-            //TODO: reversed --> normal
-            val delta=mergeMessageData(mMessageData.asReversed(), newMessageData)
+            Thread.yield()
+
+            val threadMessageData=ArrayList<KKTMessage>()
+            threadMessageData.addAll(realmlocal.where(KKTMessage::class.java).findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING)))
+            val delta=mergeMessageData(threadMessageData, newMessageData)
 
             runOnUiThread {
+                progressBar.isIndeterminate = false
+                progressText.text="Inserting messages to database ..."
+            }
+
+            reader.setOnProgressChanged(onProgressListener)
+            realmlocal.executeTransaction { realm ->
+                threadMessageData.forEachIndexed { index, kktMessage ->
+                    realm.insertOrUpdate(kktMessage)
+                    Thread.yield()
+                    runOnUiThread {
+                        onProgressListener.onProgressChanged((index+1).toLong(), threadMessageData.size.toLong())
+                    }
+                }
+            }
+
+            runOnUiThread {
+                progressBar.isIndeterminate = true
+                progressText.text="Loading messages ..."
+            }
+
+            realmlocal.close()
+
+            //TODO: reversed --> normal
+
+            runOnUiThread {
+                realmmain.close()
+                realmmain=Realm.getInstance(buildRealmConfig())
 
                 lastViewedDate = 0L
                 lastViewedPosition = 0L
-                useDatabase = false
                 lastQueryText = ""
 
-                adapter.clear()
-                adapter.addToEnd(mMessageData, false)
-                adapter.notifyDataSetChanged()
+                refreshListAndSelect(lastQueryText, controlProgress = false)
 
-                for (item in listOf(R.id.saveLog, R.id.moveToDay, R.id.findMessage)) {
+                for (item in listOf(R.id.moveToDay, R.id.findMessage)) {
                     toggleMenuItemEnabled(item, mMessageData.isNotEmpty())
                 }
-                toggleMenuItemVisible(R.id.saveLog, true)
 
                 progressBarHolder.visibility = View.GONE
 
@@ -951,40 +966,32 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun mergeMessageData(
-        mMessageData: MutableList<KKTMessage>,
+        oldMessageData: MutableList<KKTMessage>,
         newMessageData: MutableList<KKTMessage>
     ) : Int {
-        val s0 = mMessageData.first().messageTime!!
-        val e0 = mMessageData.last().messageTime!!
-        val s1 = newMessageData.first().messageTime!!
-        val e1 = newMessageData.last().messageTime!!
-        val size0=mMessageData.size
+        val so = oldMessageData.first().messageTime!!
+        val eo = oldMessageData.last().messageTime!!
+        val sn = newMessageData.first().messageTime!!
+        val en = newMessageData.last().messageTime!!
+        val szo=oldMessageData.size
 
-        if (s0 > s1 && e0 > e1) {
-            // 이전 메시지
-            mMessageData.addAll(0, newMessageData.filter{
-                it.createdAt!!.toInstant().toEpochMilli() <= s0.toInstant().toEpochMilli()
-            })
-        } else if (s0 > s1 && e0 < e1) {
-            mMessageData.addAll(0, newMessageData.filter{
-                it.createdAt!!.toInstant().toEpochMilli() <= s0.toInstant().toEpochMilli()
-            })
-            mMessageData.addAll(newMessageData.filter {
-                it.createdAt!!.toInstant().toEpochMilli() >= e0.toInstant().toEpochMilli()
-            })
-        } else if (s0 < s1 && e0 > e1) {
-            // no message to import
-        } else { // (s0 < s1 && e0 < e1)
-            mMessageData.addAll(newMessageData.filter {
-                it.createdAt!!.toInstant().toEpochMilli() >= e0.toInstant().toEpochMilli()
-            })
+        if (sn < so) {
+            val l=newMessageData.filter{
+                it.createdAt!!.toInstant().toEpochMilli() < so.toInstant().toEpochMilli()}
+            oldMessageData.addAll(0, l)
         }
 
-        mMessageData.sortBy {
+        if (en > eo) {
+            val l=newMessageData.filter{
+                it.createdAt!!.toInstant().toEpochMilli() > eo.toInstant().toEpochMilli() }
+            oldMessageData.addAll(l)
+        }
+
+        oldMessageData.sortBy {
             it.createdAt
         }
 
-        return (mMessageData.size-size0)
+        return (oldMessageData.size-szo)
     }
 
 

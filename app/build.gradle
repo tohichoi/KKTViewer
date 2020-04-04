@@ -12,7 +12,7 @@ android {
         config {
             keyAlias 'android'
             keyPassword properties.getProperty("keyPassword")
-            storeFile file(properties.getProperty("storeFile"))
+            storeFile file('C:\\Users\\k\\Documents\\AndroidKeyStore\\AndroidKeyStore.jks')
             storePassword properties.getProperty("storePassword")
         }
     }
