@@ -585,6 +585,7 @@ class MainActivity : AppCompatActivity(),
         outState.putString("lastQueryText", lastQueryText)
         outState.putLong("lastViewedDate", lastViewedDate)
         outState.putLong("lastViewedPosition", lastViewedPosition)
+        outState.putIntArray("selectedItemPosition", adapter.selectedItemPosition.toIntArray())
 
         saveCurrentState()
 
@@ -752,7 +753,7 @@ class MainActivity : AppCompatActivity(),
     private fun openLog(uri: Uri) {
 //        val offset =
 //            appBar.height + progressBarHolder.height + if (progressBar.visibility == View.VISIBLE) progressBar.height else 0
-        val toast = showToast("Importing started ...")
+//        val toast = showToast("Importing started ...")
 
         realmmain.executeTransaction {
             it.deleteAll()
@@ -813,8 +814,8 @@ class MainActivity : AppCompatActivity(),
 
                 progressBarHolder.visibility = View.GONE
 
-                toast.setText("Imported ${mMessageData.size} messages")
-                toast.show()
+//                toast.setText("Imported ${mMessageData.size} messages")
+//                toast.show()
             }
 
             realmlocal.close()
@@ -890,7 +891,7 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun mergeLog(uri: Uri) {
-        val toast = showToast("Merging started ...")
+//        val toast = showToast("Merging started ...")
 
         val runnable = Runnable {
             val realmlocal=Realm.getInstance(buildRealmConfig())
@@ -957,8 +958,8 @@ class MainActivity : AppCompatActivity(),
 
                 progressBarHolder.visibility = View.GONE
 
-                toast.setText("Merged $delta messages")
-                toast.show()
+//                toast.setText("Merged $delta messages")
+//                toast.show()
             }
         }
         val thread = Thread(runnable)
