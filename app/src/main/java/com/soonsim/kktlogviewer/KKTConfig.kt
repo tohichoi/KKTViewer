@@ -22,6 +22,11 @@ class KKTConfig(context: Context) {
         set(lastViewedPosition) = prefs.edit().putLong("lastViewedPosition", lastViewedPosition)
             .apply()
 
+    var selectedItemPosition: MutableSet<String>?
+        get() = prefs.getStringSet("selectedItemPosition", null)
+        set(selectedItemPosition) = prefs.edit().putStringSet("selectedItemPosition", selectedItemPosition)
+            .apply()
+
     var authorId: String
         get() = prefs.getString("authorId", "")!!
         set(authorId) = prefs.edit().putString("authorId", authorId).apply()

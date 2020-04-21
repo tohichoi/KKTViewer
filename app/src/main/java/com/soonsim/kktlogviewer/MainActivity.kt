@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity(),
     private lateinit var messagesListView:MessagesList
     private lateinit var realmResult:RealmResults<KKTMessage>
     private lateinit var realmmain:Realm
+    private var selectedItemPosition=ArrayList<Int>()
 //    private var toolbar:Toolbar? = null
     val onProgressListener = MyOnProgressListener()
 
@@ -100,10 +101,13 @@ class MainActivity : AppCompatActivity(),
             lastQueryText = savedInstanceState.getString("lastQueryText")!!
             lastViewedDate = savedInstanceState.getLong("lastViewedDate")
             lastViewedPosition = savedInstanceState.getLong("lastViewedPosition")
+            selectedItemPosition.addAll(savedInstanceState.getIntArray("selectedItemPosition")!!.toList())
         } else {
             lastViewedPosition = config.lastViewedPosition
             lastQueryText = config.lastQueryText
             lastViewedDate = config.lastViewedDate
+            if (config.selectedItemPosition != null)
+                selectedItemPosition.addAll(config.selectedItemPosition!!.map { it -> it.toInt()})
         }
 
 //        supportActionBar.setDefaultDisplayHomeAsUpEnabled(false)
@@ -256,6 +260,37 @@ class MainActivity : AppCompatActivity(),
             viewMessage(lastViewedPosition.toInt())
         }
 
+        // onCreate 에서 itemview 접근할 때 null 포인터 방지
+        messagesListView.viewTreeObserver.addOnGlobalLayoutListener(object: ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                if (selectedItemPosition.size > 0) {
+                    for (pos in selectedItemPosition) {
+                        // method#1: 아답터 item 바로 접근. adapter 내의 selectedItemPositions
+                        // 데이터 무결성이 깨짐
+//                        adapter.items[pos].isSelected=true
+//                        adapter.notifyItemChanged(pos)
+
+                        // method#2 : pos 에 있는 아이템이 화면에 보이면 동작하나
+                        // 화면에 보이지 않을 경우 동작 안함(클릭을 못하니까)
+//                        val itemView = messagesListView.getChildAt(pos)
+//                        itemView?.performClick()
+
+                        // method3 : 아답터에서 선택하게 함
+                        adapter.selectItem(pos)
+                    }
+                    selectedItemPosition.clear()
+                }
+                messagesListView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+            }
+        })
+
+//        if (selectedItemPosition.size > 0) {
+//            for (it in selectedItemPosition) {
+//                Handler().postDelayed({
+//                    messagesListView.findViewHolderForAdapterPosition(it)?.itemView?.performClick()
+//                }, 1)
+//            }
+//        }
         createUpdateUiHandler()
     }
 
@@ -426,6 +461,9 @@ class MainActivity : AppCompatActivity(),
         config.lastQueryText = lastQueryText
         config.lastViewedDate = lastViewedDate
         config.lastViewedPosition = lastViewedPosition
+        val hs=HashSet<String>()
+        hs.addAll(adapter.selectedItemPosition.map { it -> it.toString() } )
+        config.selectedItemPosition=hs
     }
 
 

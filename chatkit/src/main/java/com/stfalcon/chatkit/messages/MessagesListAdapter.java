@@ -726,6 +726,24 @@ public class MessagesListAdapter<MESSAGE extends IMessage>
         }
     }
 
+
+    public void selectItem(int pos) {
+        Wrapper<MESSAGE> wrapper=items.get(pos);
+        wrapper.isSelected = !wrapper.isSelected;
+
+        if (wrapper.isSelected) {
+            incrementSelectedItemsCount();
+            selectedItemPosition.add(pos);
+        }
+        else {
+            decrementSelectedItemsCount();
+            selectedItemPosition.remove(pos);
+        }
+
+        notifyItemChanged(pos);
+    }
+
+
     private View.OnClickListener getMessageClickListener(final Wrapper<MESSAGE> wrapper) {
         return new View.OnClickListener() {
             @Override
