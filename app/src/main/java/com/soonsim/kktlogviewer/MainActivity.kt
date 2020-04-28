@@ -63,7 +63,8 @@ class MainActivity : AppCompatActivity(),
     private lateinit var viewManager:LinearLayoutManager
     lateinit var messagesListViewLayoutParam:ViewGroup.LayoutParams
     private lateinit var messagesListView:MessagesList
-    private lateinit var realmResult:RealmResults<KKTMessage>
+    private var realmResult:RealmResults<KKTMessage>?=null
+    private var realmQuery:RealmQuery<KKTMessage>?=null
     private lateinit var realmmain:Realm
     private var selectedItemPosition=ArrayList<Int>()
 //    private var toolbar:Toolbar? = null
@@ -81,7 +82,9 @@ class MainActivity : AppCompatActivity(),
             runOnUiThread {
                 progressBar.progress = position.toInt()
                 progressBar.max = totalCount.toInt()
-//                progressText.text = "$position/$totalCount"
+                if (progressBar.progress % 100 == 0 || progressBar.max == progressBar.progress) {
+                    progressText.text = "$position/$totalCount lines"
+                }
             }
         }
     }
@@ -221,6 +224,7 @@ class MainActivity : AppCompatActivity(),
 
         query.setEndIconOnLongClickListener {
             query.editText?.setText("")
+            refreshListAndSelect("", doFreshQuery = true)
             searchVisible = false
             toggleFilterView(false)
             showKeyboard(this, false)
@@ -235,8 +239,8 @@ class MainActivity : AppCompatActivity(),
         }
 
         query.editText?.doOnTextChanged { text, start, count, after ->
-            lastQueryText = text.toString()
-            refreshListAndSelect(lastQueryText)
+//            lastQueryText = text.toString()
+//            refreshListAndSelect(lastQueryText)
 //            refreshList(query.editText?.text.toString())
         }
 
@@ -244,6 +248,7 @@ class MainActivity : AppCompatActivity(),
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 lastQueryText = v.text.toString()
                 config.lastQueryText = lastQueryText
+                refreshListAndSelect(lastQueryText, doFreshQuery = true)
 //                searchVisible = false
 //                toggleFilterView(false)
                 true
@@ -255,6 +260,7 @@ class MainActivity : AppCompatActivity(),
         realmmain = Realm.getInstance(buildRealmConfig())
 
         query.editText?.setText(lastQueryText)
+        refreshListAndSelect(lastQueryText, false, doFreshQuery = true)
 
         if (lastViewedPosition >= 0) {
             viewMessage(lastViewedPosition.toInt())
@@ -335,7 +341,7 @@ class MainActivity : AppCompatActivity(),
             .build()
     }
 
-    private fun refreshListAndSelect(query: String, controlProgress:Boolean=true) {
+    private fun refreshListAndSelect(query: String, controlProgress:Boolean=true, doFreshQuery:Boolean=false) {
         // keep selection
         val sellist=HashSet<String>()
         sellist.addAll(adapter.selectedMessages.map {
@@ -348,15 +354,22 @@ class MainActivity : AppCompatActivity(),
             progressBar.isIndeterminate = true
         }
 
-        var realmQuery=realmmain.where(KKTMessage::class.java)
-        if (query.isNotEmpty())
-            realmQuery=realmQuery.contains("messageText", query, Case.INSENSITIVE)
+        if (realmQuery == null || doFreshQuery)
+            realmQuery=realmmain.where(KKTMessage::class.java)
 
-        realmResult = realmQuery.findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING))
+        if (query.isNotEmpty()) {
+            realmQuery = realmQuery!!.contains("messageText", query, Case.INSENSITIVE)
+            lastQueryText = query
+        }
+
+        if (realmResult == null || doFreshQuery)
+            realmResult = realmQuery!!.findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING))
+
+//        Log.i("mike", "realmresult: ${realmResult!!.size}")
 
 //        if (realmResult.isNotEmpty()) {
             mMessageData.clear()
-            mMessageData.addAll(realmResult.toList())
+            mMessageData.addAll(realmResult!!.toList())
 
             adapter.clear()
             adapter.addToEnd(mMessageData, true)
@@ -476,7 +489,7 @@ class MainActivity : AppCompatActivity(),
     }
 
     override fun onLoadMore(page: Int, totalItemsCount: Int) {
-        Log.i("mike", "onLoadMore: $page $totalItemsCount")
+//        Log.i("mike", "onLoadMore: $page $totalItemsCount")
         /*
         if (totalItemsCount < com.stfalcon.chatkit.sample.features.demo.DemoMessagesActivity.TOTAL_MESSAGES_COUNT) {
             loadMessages()
@@ -796,6 +809,7 @@ class MainActivity : AppCompatActivity(),
         realmmain.executeTransaction {
             it.deleteAll()
         }
+//        deleteDb()
 
         val runnable = Runnable {
             runOnUiThread {
@@ -826,6 +840,8 @@ class MainActivity : AppCompatActivity(),
                 }
             }
 
+            realmlocal.close()
+
             runOnUiThread {
                 progressBar.isIndeterminate = true
                 progressText.text="Loading messages ..."
@@ -834,17 +850,15 @@ class MainActivity : AppCompatActivity(),
             Thread.yield()
 
             runOnUiThread {
-                if (realmmain.isEmpty) {
-                    realmmain.close()
-                    realmmain=Realm.getInstance(buildRealmConfig())
-                }
+                realmmain.close()
+                realmmain=Realm.getInstance(buildRealmConfig())
 
                 lastViewedDate = 0L
                 lastViewedPosition = 0L
                 lastQueryText = ""
 
                 progressBar.isIndeterminate = true
-                refreshListAndSelect(lastQueryText, false)
+                refreshListAndSelect(lastQueryText, false, doFreshQuery = true)
 
                 for (item in listOf(R.id.moveToDay, R.id.findMessage)) {
                     toggleMenuItemEnabled(item, mMessageData.isNotEmpty())
@@ -855,8 +869,6 @@ class MainActivity : AppCompatActivity(),
 //                toast.setText("Imported ${mMessageData.size} messages")
 //                toast.show()
             }
-
-            realmlocal.close()
 
 //            val sendingmessage=Message()
 //            sendingmessage.what=MESSAGE_READ_COMPLETE
@@ -929,61 +941,59 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun mergeLog(uri: Uri) {
-//        val toast = showToast("Merging started ...")
-
-        val runnable = Runnable {
-            val realmlocal=Realm.getInstance(buildRealmConfig())
+//        val runnable = Runnable {
+//            val realmlocal=Realm.getInstance(buildRealmConfig())
             val reader = KKTChatTextReader(this, config.authorId)
             reader.setOnProgressChanged(onProgressListener)
 
-            runOnUiThread {
+//            runOnUiThread {
                 progressBarHolder.visibility = View.VISIBLE
                 progressBar.isIndeterminate = false
                 progressText.text="Parsing log file ..."
-            }
+//            }
 
             val newMessageData = reader.readFile(uri, mMessageData.size)
 
-            runOnUiThread {
+//            runOnUiThread {
                 progressBar.isIndeterminate = true
                 progressText.text="Analyzing log file ..."
-            }
+//            }
 
-            Thread.yield()
+//            Thread.yield()
 
-            val threadMessageData=ArrayList<KKTMessage>()
-            threadMessageData.addAll(realmlocal.where(KKTMessage::class.java).findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING)))
-            val delta=mergeMessageData(threadMessageData, newMessageData)
+//            val threadMessageData=ArrayList<KKTMessage>()
+//            threadMessageData.addAll(realmlocal.where(KKTMessage::class.java).findAll().sort(arrayOf("messageTime"), arrayOf(Sort.ASCENDING)))
 
-            runOnUiThread {
+            val threadMessageData=mMessageData
+
+            val mergedMessageData=mergeMessageData(threadMessageData, newMessageData)
+
+//            runOnUiThread {
                 progressBar.isIndeterminate = false
                 progressText.text="Inserting messages to database ..."
-            }
+//            }
 
             reader.setOnProgressChanged(onProgressListener)
-            realmlocal.executeTransaction { realm ->
-                threadMessageData.forEachIndexed { index, kktMessage ->
-                    realm.insertOrUpdate(kktMessage)
-                    Thread.yield()
+//            realmlocal.executeTransaction { realm ->
+//                threadMessageData.forEachIndexed { index, kktMessage ->
+//                    realm.insertOrUpdate(kktMessage)
+//                    Thread.yield()
+//                    runOnUiThread {
+//                        onProgressListener.onProgressChanged((index+1).toLong(), threadMessageData.size.toLong())
+//                    }
+//                }
+//            }
+
+            realmmain.executeTransactionAsync( {
+                mergedMessageData.forEachIndexed { index, kktMessage ->
+                    it.insertOrUpdate(kktMessage)
+//                    Thread.yield()
+                    Log.d("mike", "realmmain.executeTransactionAsync: $index")
                     runOnUiThread {
-                        onProgressListener.onProgressChanged((index+1).toLong(), threadMessageData.size.toLong())
+                        onProgressListener.onProgressChanged((index+1).toLong(), mergedMessageData.size.toLong())
                     }
                 }
-            }
-
-            runOnUiThread {
-                progressBar.isIndeterminate = true
-                progressText.text="Loading messages ..."
-            }
-
-            realmlocal.close()
-
-            //TODO: reversed --> normal
-
-            runOnUiThread {
-                realmmain.close()
-                realmmain=Realm.getInstance(buildRealmConfig())
-
+            }, {
                 lastViewedDate = 0L
                 lastViewedPosition = 0L
                 lastQueryText = ""
@@ -995,42 +1005,70 @@ class MainActivity : AppCompatActivity(),
                 }
 
                 progressBarHolder.visibility = View.GONE
+            }, {
 
-//                toast.setText("Merged $delta messages")
-//                toast.show()
             }
-        }
-        val thread = Thread(runnable)
-        thread.start()
+            )
+
+//            runOnUiThread {
+//                progressBar.isIndeterminate = true
+//                progressText.text="Loading messages ..."
+//            }
+
+//            realmlocal.close()
+
+            //TODO: reversed --> normal
+
+//            runOnUiThread {
+//                realmmain.close()
+//                realmmain=Realm.getInstance(buildRealmConfig())
+
+//                lastViewedDate = 0L
+//                lastViewedPosition = 0L
+//                lastQueryText = ""
+//
+//                refreshListAndSelect(lastQueryText, controlProgress = false)
+//
+//                for (item in listOf(R.id.moveToDay, R.id.findMessage)) {
+//                    toggleMenuItemEnabled(item, mMessageData.isNotEmpty())
+//                }
+//
+//                progressBarHolder.visibility = View.GONE
+//            }
+//        }
+//        val thread = Thread(runnable)
+//        thread.start()
     }
 
     private fun mergeMessageData(
         oldMessageData: MutableList<KKTMessage>,
         newMessageData: MutableList<KKTMessage>
-    ) : Int {
-        val so = oldMessageData.first().messageTime!!
-        val eo = oldMessageData.last().messageTime!!
-        val sn = newMessageData.first().messageTime!!
-        val en = newMessageData.last().messageTime!!
+    ) : ArrayList<KKTMessage> {
+//        val so = oldMessageData.last().messageTime!!
+        val so = oldMessageData.minBy { it.messageTime!! }!!.messageTime
+        val eo = oldMessageData.maxBy { it.messageTime!! }!!.messageTime
+        val sn = newMessageData.minBy { it.messageTime!! }!!.messageTime
+        val en = newMessageData.maxBy { it.messageTime!! }!!.messageTime
         val szo=oldMessageData.size
+        val diffMessageData=ArrayList<KKTMessage>()
 
-        if (sn < so) {
+        if (sn!! < so!!) {
             val l=newMessageData.filter{
-                it.createdAt!!.toInstant().toEpochMilli() < so.toInstant().toEpochMilli()}
-            oldMessageData.addAll(0, l)
+                it.messageTime!!.toInstant().toEpochMilli() < so.toInstant().toEpochMilli()}
+            diffMessageData.addAll(0, l)
         }
 
-        if (en > eo) {
+        if (en!! > eo!!) {
             val l=newMessageData.filter{
-                it.createdAt!!.toInstant().toEpochMilli() > eo.toInstant().toEpochMilli() }
-            oldMessageData.addAll(l)
+                it.messageTime!!.toInstant().toEpochMilli() > eo.toInstant().toEpochMilli() }
+            diffMessageData.addAll(l)
         }
 
-        oldMessageData.sortBy {
-            it.createdAt
+        diffMessageData.sortBy {
+            it.messageTime
         }
 
-        return (oldMessageData.size-szo)
+        return diffMessageData
     }
 
 
