@@ -32,11 +32,14 @@ import io.realm.*
 import kotlinx.android.synthetic.main.activity_main.*
 import org.apache.commons.lang3.time.DateFormatUtils
 import org.apache.commons.lang3.time.DateUtils
+import java.io.File
+import java.io.IOException
 import java.lang.Integer.max
 import java.lang.Integer.min
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.math.abs
 
 
@@ -88,7 +91,29 @@ class MainActivity : AppCompatActivity(),
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        setSupportActionBar(toolbar)
+        setSupportActionBar(findViewById(R.id.toolbar))
+
+
+        // clear the previous logcat and then write the new one to the file
+
+//        val appDirectory =
+//            File(Environment.getExternalStorageDirectory().toString())
+//
+//        val logDirectory = File(appDirectory.toString())
+
+        val logDirectory: String = filesDir.absolutePath
+
+        val logFile =
+            File(logDirectory, "logcat" + System.currentTimeMillis() + ".txt")
+        // clear the previous logcat and then write the new one to the file
+        try {
+            var process = Runtime.getRuntime().exec("logcat -c")
+            process = Runtime.getRuntime()
+                .exec("logcat -f $logFile *:V MainActivity:V")
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        Log.d("mike", "Logging started")
 
         config = KKTConfig(this)
 
@@ -156,6 +181,8 @@ class MainActivity : AppCompatActivity(),
         })
 
         appBarLayout.addOnOffsetChangedListener(AppBarLayout.OnOffsetChangedListener { appBarLayout, verticalOffset ->
+//            Log.d("mike", "appBarHeight: $appBarLayoutHeight, offset: $verticalOffset")
+
             if (abs(verticalOffset) - appBarLayout.totalScrollRange == 0) {
                 // Collapsed
                 appBarLayoutHeight=0
@@ -352,7 +379,7 @@ class MainActivity : AppCompatActivity(),
     private fun toggleFilterView(isVisible: Boolean) {
 
 //        mFirstTouch = 0F
-        val height = if (isVisible) 0F else query.height.toFloat().unaryMinus()
+        val height = if (isVisible) 0 else query.height
 //        if (!isVisible) {
 //            this.currentFocus?.let { focusView ->
 //                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
@@ -362,8 +389,10 @@ class MainActivity : AppCompatActivity(),
 //
         if (!isVisible) {
             query.visibility = View.GONE
+//            appBarLayoutHeight=appBarLayout.height - query.height
         } else {
             query.visibility = View.VISIBLE
+//            appBarLayoutHeight=appBarLayout.height + query.height
             query.requestFocus()
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             imm.showSoftInput(query, SHOW_IMPLICIT)
@@ -512,8 +541,8 @@ class MainActivity : AppCompatActivity(),
 //            val dateheadersize=if (adapter.dateHeaderHeight==0) spToPx(resources.getDimension(R.dimen.message_date_header_text_size), this) else adapter.dateHeaderHeight
             val dateheadersize = adapter.dateHeaderHeight
             var offset = messagesListView.bottom - dateheadersize - appBarLayoutHeight
-            if (absDatePos==adapter.itemCount-1)
-                offset+=appBarLayoutHeight
+//            if (absDatePos==adapter.itemCount-1)
+//                offset+=appBarLayoutHeight
             llm.scrollToPositionWithOffset(absDatePos, offset)
         }
     }
@@ -796,10 +825,8 @@ class MainActivity : AppCompatActivity(),
             Thread.yield()
 
             runOnUiThread {
-                if (realmmain.isEmpty) {
-                    realmmain.close()
-                    realmmain=Realm.getInstance(buildRealmConfig())
-                }
+                realmmain.close()
+                realmmain=Realm.getInstance(buildRealmConfig())
 
                 lastViewedDate = 0L
                 lastViewedPosition = 0L
@@ -813,6 +840,8 @@ class MainActivity : AppCompatActivity(),
                 }
 
                 progressBarHolder.visibility = View.GONE
+
+                viewMessageFromDate(mMessageData.first().createdAt!!, true)
 
 //                toast.setText("Imported ${mMessageData.size} messages")
 //                toast.show()
