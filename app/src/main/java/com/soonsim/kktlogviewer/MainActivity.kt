@@ -102,10 +102,11 @@ class MainActivity : AppCompatActivity(),
 //
 //        val logDirectory = File(appDirectory.toString())
 
-        val logDirectory: String = filesDir.absolutePath
-
+//        val logDirectory: String = filesDir.absolutePath
+        val logDirectory=getExternalFilesDir(null)
         val logFile =
-            File(logDirectory, "logcat" + System.currentTimeMillis() + ".txt")
+//            File(logDirectory, "logcat" + System.currentTimeMillis() + ".txt")
+            File(logDirectory, "KKTViewer" + ".txt")
         // clear the previous logcat and then write the new one to the file
         try {
             var process = Runtime.getRuntime().exec("logcat -c")
@@ -355,6 +356,7 @@ class MainActivity : AppCompatActivity(),
 
     private fun buildRealmConfig(): RealmConfiguration {
         return RealmConfiguration.Builder()
+            .directory(getExternalFilesDir(null)!!)
             .name("kktviewer.realm")
 //            .encryptionKey(getMyKey())
             .schemaVersion(2)
