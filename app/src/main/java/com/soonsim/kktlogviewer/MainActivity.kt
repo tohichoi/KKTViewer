@@ -109,12 +109,12 @@ class MainActivity : AppCompatActivity(),
         val logDirectory=getExternalFilesDir(null)
         val logFile =
 //            File(logDirectory, "logcat" + System.currentTimeMillis() + ".txt")
-            File(logDirectory, "KKTViewer" + ".txt")
+            File(logDirectory, "KKTViewerLog" + ".txt")
         // clear the previous logcat and then write the new one to the file
         try {
             var process = Runtime.getRuntime().exec("logcat -c")
             process = Runtime.getRuntime()
-                .exec("logcat -f $logFile *:V MainActivity:V")
+                .exec("logcat -f $logFile *:D MainActivity:D")
         } catch (e: IOException) {
             e.printStackTrace()
         }
@@ -718,10 +718,56 @@ class MainActivity : AppCompatActivity(),
                 copyMessages()
                 true
             }
+            R.id.statistics -> {
+                showStatistics()
+                true
+            }
             else -> {
                 super.onOptionsItemSelected(item)
             }
         }
+    }
+
+
+    private fun getStatisticsMessage() : String {
+        var msgstr:String=""
+
+        val allmsg=realmmain.where(KKTMessage::class.java).findAll()
+        val totalcount=allmsg.count()
+        val totallength=allmsg.sumBy {
+            it.messageText!!.length
+        }
+
+        msgstr += "Count\n"
+        // 사람별 메시지 크기(byte)
+        val authors=realmmain.where(KKTAuthor::class.java).distinct("authorId").findAll()
+        for (a in authors) {
+            val m=realmmain.where(KKTMessage::class.java).equalTo("author.authorId", a.authorId).findAll()
+            val ml=m.count()
+            msgstr += a.authorAlias + " : "
+            msgstr += "$ml (" + "%.1f%%".format(100 * ml.toFloat() / totalcount) + ")\n"
+        }
+
+        msgstr += "\n"
+        msgstr += "Length\n"
+        for (a in authors) {
+            val m=realmmain.where(KKTMessage::class.java).equalTo("author.authorId", a.authorId).findAll()
+            val ml=m.sumBy {
+                it.messageText!!.length
+            }
+            msgstr += a.authorAlias + " : "
+            msgstr += "$ml (" + "%.1f%%".format(100 * ml.toFloat() / totallength) + ")\n"
+        }
+
+        return msgstr
+    }
+
+    private fun showStatistics() {
+        val builder=AlertDialog.Builder(this)
+            .setTitle("Simple statistics")
+            .setMessage(getStatisticsMessage())
+            .setPositiveButton(R.string.ok, null)
+        builder.show()
     }
 
     private fun deleteDb() {
