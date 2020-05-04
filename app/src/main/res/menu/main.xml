@@ -39,4 +39,11 @@
         android:title="Delete data"
         android:visible="true"
         app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/statistics"
+        android:icon="@drawable/ic_bar_chart"
+        android:title="Statistics..."
+        android:visible="true"
+        app:showAsAction="ifRoom" />
 </menu>

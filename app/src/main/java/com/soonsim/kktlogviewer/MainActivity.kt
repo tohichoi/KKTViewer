@@ -1,3 +1,5 @@
+@file:Suppress("SpellCheckingInspection")
+
 package com.soonsim.kktlogviewer
 
 import android.app.Activity
@@ -732,7 +734,8 @@ class MainActivity : AppCompatActivity(),
     private fun getStatisticsMessage() : String {
         var msgstr:String=""
 
-        val allmsg=realmmain.where(KKTMessage::class.java).findAll()
+        fun q() = realmmain.where(KKTMessage::class.java)
+        val allmsg=q().findAll()
         val totalcount=allmsg.count()
         val totallength=allmsg.sumBy {
             it.messageText!!.length
@@ -742,7 +745,7 @@ class MainActivity : AppCompatActivity(),
         // 사람별 메시지 크기(byte)
         val authors=realmmain.where(KKTAuthor::class.java).distinct("authorId").findAll()
         for (a in authors) {
-            val m=realmmain.where(KKTMessage::class.java).equalTo("author.authorId", a.authorId).findAll()
+            val m=q().equalTo("author.authorId", a.authorId).findAll()
             val ml=m.count()
             msgstr += a.authorAlias + " : "
             msgstr += "$ml (" + "%.1f%%".format(100 * ml.toFloat() / totalcount) + ")\n"
@@ -751,7 +754,7 @@ class MainActivity : AppCompatActivity(),
         msgstr += "\n"
         msgstr += "Length\n"
         for (a in authors) {
-            val m=realmmain.where(KKTMessage::class.java).equalTo("author.authorId", a.authorId).findAll()
+            val m=q().equalTo("author.authorId", a.authorId).findAll()
             val ml=m.sumBy {
                 it.messageText!!.length
             }
