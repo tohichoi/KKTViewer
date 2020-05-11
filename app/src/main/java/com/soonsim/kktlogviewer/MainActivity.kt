@@ -16,6 +16,7 @@ import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
+import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doOnTextChanged
@@ -36,13 +37,14 @@ import org.apache.commons.lang3.time.DateFormatUtils
 import org.apache.commons.lang3.time.DateUtils
 import java.io.File
 import java.io.IOException
-import java.lang.Integer.max
-import java.lang.Integer.min
+import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
 
 const val MESSAGE_READ_COMPLETE=100
@@ -702,6 +704,10 @@ class MainActivity : AppCompatActivity(),
                 getLogFilePathFromUser(REQUEST_CODE_MERGE_TEXT)
                 true
             }
+            R.id.deleteMessages -> {
+                deleteMessages()
+                true
+            }
             R.id.deleteDb -> {
                 deleteDb()
                 true
@@ -728,6 +734,45 @@ class MainActivity : AppCompatActivity(),
                 super.onOptionsItemSelected(item)
             }
         }
+    }
+
+    private fun deleteMessages() {
+        val dlg = androidx.appcompat.app.AlertDialog.Builder(this)
+        dlg.setTitle("Delete messages")
+        dlg.setMessage("Delete message between 00:00 at start date and 00:00 at end date")
+        val inflater: LayoutInflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
+        val dialogView: View = inflater.inflate(R.layout.dialog_delete_messages, null)
+        dlg.setView(dialogView)
+        val es=dialogView.findViewById<EditText>(R.id.startDate)
+        val ee=dialogView.findViewById<EditText>(R.id.endDate)
+        es.setText("20200507")
+        ee.setText("20200601")
+        ee.selectAll()
+        dlg.setNegativeButton(R.string.cancel, null)
+        dlg.setPositiveButton(R.string.ok) { dialog, which ->
+            fun q() = realmmain.where(KKTMessage::class.java)
+//            val ds=DateUtils.par
+            val date1: Date? = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).parse(es.text.toString())
+            val date2: Date? = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).parse(ee.text.toString())
+            if (date1 == null || date2 == null) {
+                showToast("Invalid date format")
+                return@setPositiveButton
+            }
+            val res=q().between("messageTime", date1, date2).findAll()
+            val delsize=res.count()
+            realmmain.executeTransaction {
+                res.deleteAllFromRealm()
+            }
+            refreshListAndSelect(lastQueryText, true, false)
+            showToast("Deleted $delsize messages")
+        }
+
+        // show ime : NOT WORKING
+        /*
+        window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+         */
+        dlg.show()
     }
 
 
@@ -830,7 +875,7 @@ class MainActivity : AppCompatActivity(),
     private fun getDateFromUser() {
 
         val datelist = ArrayList<Long>()
-        val selecteddate: Long
+        var selecteddate: Long = 0L
 
         for (item in adapter.dateSet) {
             var cal = getClearedUtc()
@@ -843,18 +888,20 @@ class MainActivity : AppCompatActivity(),
             datelist.add(cal.timeInMillis)
         }
 
+        val startdate = datelist.min()!!
+        val enddate = datelist.max()!!
         selecteddate = if (lastViewedDate == 0L)
             datelist.min()!!
         else
             lastViewedDate
+
+        selecteddate= max(startdate, min(selecteddate, enddate))
 
         val builder: MaterialDatePicker.Builder<*> =
             MaterialDatePicker.Builder.datePicker().setSelection(selecteddate)
         val constraintsBuilder: CalendarConstraints.Builder =
             CalendarConstraints.Builder().setValidator(DateListValidator(datelist))
 
-        val startdate = datelist.min()!!
-        val enddate = datelist.max()!!
         constraintsBuilder.setStart(startdate)
         constraintsBuilder.setEnd(enddate)
         constraintsBuilder.setOpenAt(selecteddate)

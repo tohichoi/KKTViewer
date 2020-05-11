@@ -34,9 +34,16 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/deleteMessages"
+        android:icon="@drawable/delete_forever"
+        android:title="Delete messages..."
+        android:visible="true"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/deleteDb"
         android:icon="@drawable/delete_forever"
-        android:title="Delete data"
+        android:title="Delete database"
         android:visible="true"
         app:showAsAction="ifRoom" />
 
