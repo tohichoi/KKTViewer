@@ -745,8 +745,8 @@ class MainActivity : AppCompatActivity(),
         dlg.setView(dialogView)
         val es=dialogView.findViewById<EditText>(R.id.startDate)
         val ee=dialogView.findViewById<EditText>(R.id.endDate)
-        es.setText("20200507")
-        ee.setText("20200601")
+        es.setText(config.deleteMessagesFrom)
+        ee.setText(config.deleteMessagesTo)
         ee.selectAll()
         dlg.setNegativeButton(R.string.cancel, null)
         dlg.setPositiveButton(R.string.ok) { dialog, which ->
@@ -765,6 +765,9 @@ class MainActivity : AppCompatActivity(),
             }
             refreshListAndSelect(lastQueryText, true, false)
             showToast("Deleted $delsize messages")
+
+            config.deleteMessagesFrom=es.text.toString()
+            config.deleteMessagesTo=ee.text.toString()
         }
 
         // show ime : NOT WORKING
@@ -891,7 +894,7 @@ class MainActivity : AppCompatActivity(),
         val startdate = datelist.min()!!
         val enddate = datelist.max()!!
         selecteddate = if (lastViewedDate == 0L)
-            datelist.min()!!
+            datelist.max()!!
         else
             lastViewedDate
 
@@ -1081,7 +1084,10 @@ class MainActivity : AppCompatActivity(),
                 progressText.text="Parsing log file ..."
 //            }
 
-            val newMessageData = reader.readFile(uri, mMessageData.size)
+            val lastIdMessage = mMessageData.maxBy {
+                it.messageId?.toInt()!!
+            }
+            val newMessageData = reader.readFile(uri, lastIdMessage?.messageId?.toInt())
 
 //            runOnUiThread {
                 progressBar.isIndeterminate = true

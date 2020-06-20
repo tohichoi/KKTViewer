@@ -31,6 +31,14 @@ class KKTConfig(context: Context) {
         get() = prefs.getString("authorId", "")!!
         set(authorId) = prefs.edit().putString("authorId", authorId).apply()
 
+    var deleteMessagesFrom : String
+        get() = prefs.getString("deleteMessagesFrom", "20200101")!!
+        set(deleteMessagesFrom) = prefs.edit().putString("deleteMessagesFrom", deleteMessagesFrom).apply()
+
+    var deleteMessagesTo : String
+        get() = prefs.getString("deleteMessagesTo", "20201005")!!
+        set(deleteMessagesTo) = prefs.edit().putString("deleteMessagesTo", deleteMessagesTo).apply()
+
     var lastOpenedFile: String
         get() = prefs.getString("lastOpenedFile", "")!!
         set(lastOpenedFile) = prefs.edit().putString("lastOpenedFile", authorId).apply()
