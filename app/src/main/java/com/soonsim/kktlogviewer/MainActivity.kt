@@ -302,7 +302,9 @@ class MainActivity : AppCompatActivity(),
         messagesListView.viewTreeObserver.addOnGlobalLayoutListener(object: ViewTreeObserver.OnGlobalLayoutListener {
             override fun onGlobalLayout() {
                 if (selectedItemPosition.size > 0) {
-                    for (pos in selectedItemPosition) {
+                    for (pos in selectedItemPosition.filter {
+                        it < adapter.items.size
+                    }) {
                         // method#1: 아답터 item 바로 접근. adapter 내의 selectedItemPositions
                         // 데이터 무결성이 깨짐
 //                        adapter.items[pos].isSelected=true
